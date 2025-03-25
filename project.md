@@ -53,3 +53,41 @@ Bonus points:
 - machine learning
 - performance as a part of documentation
 
+
+### Changes made
+- switching frontend technology (flutter -> React-Native)
+#### Folder structure
+I have made the executivev decision to switch to React Native after couple of workshops during our class, which revolved around creating an app using React-Native.
+Flutter is almost impossible to configure, and although I have previous experience, React is more widely used framework. Based on JavaScript, with which I have a lot of experience,
+I think it is the best option we have. Second reason I made the decision is I use Windows laptop (I have MBP 2015, not sufficient enough), and plan to develop for iOS devices since I use one.
+React-Native with Expo Go enables me to develop for iOS device and I can see the app in my phone!!!!
+
+```
+npx create-expo-app@latest
+```
+Potom si len zvolime meno pre nas projekt, ja som dal stuface. Nainstaluju sa dependencies a po zbuildeni staci len
+
+```
+cd stuface
+npx expo start
+```
+
+Then I just scan the QR code with my phone and Expo Go opens, showing me the app.
+
+*FOLDER STRUCTURE*
+```
+stuface
+    >app
+        layout.tsx
+        home.tsx
+        login.tsx
+        register.tsx
+        profile.tsx
+        topics.tsx
+        */ folder containing all of the screens....layout.tsx contains <Stack /> which is then wrapped in providers 
+    >components
+        */ folder for reusable components used within our app
+    >hooks
+        */ hooks for providers, helper functions,...
+```
+
