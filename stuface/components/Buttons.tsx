@@ -1,23 +1,16 @@
 import React from "react";
-import {
-  Text,
-  View,
-  TextInput,
-  StyleSheet,
-  TouchableHighlight,
-  Button,
-} from "react-native";
+import { View, StyleSheet, TouchableHighlight, Button, Text } from "react-native";
 
 type buttonProps = {
-  title: string,
-  
-}
+  title: string;
+  onPress: () => void;
+};
 
-function Buttons(props: buttonProps ) {
+function Buttons(props: buttonProps) {
   return (
     <View>
-      <TouchableHighlight style={styles.button}>
-        <Button title={props.title} color="white" />
+      <TouchableHighlight style={styles.button} onPress={props.onPress}>
+        <Text style={{ fontSize: 16, color: "white", textAlign: "center", padding: 10}}>{props.title}</Text>
       </TouchableHighlight>
     </View>
   );
@@ -29,6 +22,10 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     width: 150,
     margin: 25,
+    shadowColor: "black",
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.4,
+    shadowRadius: 1,
   },
 });
 
