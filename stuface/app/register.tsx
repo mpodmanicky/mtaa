@@ -1,38 +1,26 @@
 import Buttons from "@/components/Buttons";
-import React, { useState } from "react";
-import { Stack, useRouter } from "expo-router";
+import Inputs from "@/components/Inputs";
 import { Ionicons } from "@expo/vector-icons";
+import { Stack, useRouter } from "expo-router";
+import React from "react";
 import {
-  Button,
-  ImageBackground,
-  ScrollView,
-  StyleSheet,
   Text,
-  TextInput,
-  TouchableHighlight,
-  View,
-  TouchableWithoutFeedback,
+  ImageBackground,
   Keyboard,
   TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
 } from "react-native";
-import Inputs from "@/components/Inputs";
 
-export default function Login() {
+export default function Register() {
   const router = useRouter();
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-
   return (
     <>
-      {/*TouchableWithoutFeedback nemoze mat viac ako jedno dieta takze pouzivame <></> */}
-      <Stack.Screen
-        options={{
-          headerShown: false,
-          headerTitle: "",
-          headerBackButtonDisplayMode: "minimal",
-        }}
-      />
-      <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <TouchableWithoutFeedback
+        onPress={() => Keyboard.dismiss()}
+        style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+      >
         <ImageBackground
           source={require("../assets/images/LoginScreenBackground.png")}
           resizeMode="cover"
@@ -73,10 +61,11 @@ export default function Login() {
             >
               STUFace
             </Text>
-            <Inputs placeholder="Username" isPassword={false}/>
-            <Inputs placeholder="Password" isPassword={true}/> 
-            <Buttons title="Login" onPress={() => {}} />
-            <Text>OR</Text>
+            <Inputs placeholder="Name" isPassword={false} />
+            <Inputs placeholder="E-mail@stuba.sk" isPassword={false} />
+            <Inputs placeholder="Password" isPassword={true} />
+            <Inputs placeholder="Repeat Password" isPassword={true} />
+            <Text>Toggle pre zobrazenie hesiel</Text>
             <Buttons title="Register" onPress={() => {}} />
           </View>
         </ImageBackground>
@@ -84,7 +73,3 @@ export default function Login() {
     </>
   );
 }
-
-const styles = StyleSheet.create({
-  
-});

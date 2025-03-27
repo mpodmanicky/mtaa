@@ -28,7 +28,7 @@ export default function Index() {
             <Text>OR</Text>
             <Buttons title="Register" onPress={() => {
               router.push({
-                pathname: "/"
+                pathname: "/register"
               })
             }} />
           </View>
