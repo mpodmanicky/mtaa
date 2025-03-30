@@ -56,6 +56,17 @@ app.post('/register', async (req, res) => {
   }
 });
 
+app.post('/login', (req, res) => {
+  const user = req.body
+
+  try {
+    // doplnit logiku pre login checkovanie hesiel a podobne
+  } catch (e) {
+    console.error("Something went wrong when logging in...", e);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+})
+
 // simple get request to retrieve user with id 1 from the database, get usually works with uri not body
 app.get('/user', async (req, res) => {
   try {
