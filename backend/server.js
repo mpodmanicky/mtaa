@@ -88,6 +88,29 @@ app.post('/login', async (req, res) => {
   }
 });
 
+/**
+ * @returns updated user profile
+ * Users can update their profile information
+ */
+app.post('/profile', async (req, res) => {});
+
+/**
+ * @returns topic users, messages and all content based on id
+ * User clicks on desired topic
+ * Topic loads along with user posts and content
+ */
+app.get('/topic', async (req, res) => {
+
+});
+
+/**
+ * @returns created topic with empty content
+ * User creates his own topic and can set it up to be either public/private
+ * He can invite people to his topic
+ * 
+ */
+app.post('/topic', async (req, res) => {});
+
 // simple get request to retrieve user with id 1 from the database, get usually works with uri not body
 app.get('/user', async (req, res) => {
   try {
