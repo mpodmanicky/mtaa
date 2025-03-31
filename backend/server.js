@@ -26,6 +26,14 @@ setTimeout(() => {
 
 app.use(express.json());
 // register post api call, we could enhance it with password hashing with modules like bcrypt, further in the project
+/**
+ * @return returns status code with json message along with user data
+ * @params request body
+ * Api call to register user
+ * Checking if the user exists
+ * Checking if the passwords match
+ * On successfull auth sent 200, along with json user data
+ */
 app.post('/register', async (req, res) => {
   //user object typically replacable with req.body creating object alike
   // const user = {
@@ -56,16 +64,29 @@ app.post('/register', async (req, res) => {
   }
 });
 
-app.post('/login', (req, res) => {
+/**
+ * @return returns status code along with json message containing user data
+ * @params request body
+ */
+app.post('/login', async (req, res) => {
   const user = req.body
 
   try {
-    // doplnit logiku pre login checkovanie hesiel a podobne
+    const existing_user = await pool.query("select * from users where username = $1", [user.username]);
+    if(existing_user.rows.length === 0) {
+      return res.status(404).json({ message: "User does not exist!" });
+    } else {
+      if (user.password === existing_user.rows[0].password) {
+        return res.status(200).json({ message: "User logged in successfully!" });
+      } else {
+        return res.status(400).json({ error: "Incorrect password!" });
+      }
+    }
   } catch (e) {
     console.error("Something went wrong when logging in...", e);
     return res.status(500).json({ error: "Internal server error" });
   }
-})
+});
 
 // simple get request to retrieve user with id 1 from the database, get usually works with uri not body
 app.get('/user', async (req, res) => {
