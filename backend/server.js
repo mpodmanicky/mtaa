@@ -82,8 +82,11 @@ app.post('/login', async (req, res) => {
 /**
  * @returns updated user profile
  * Users can update their profile information
+ * put/patch/update
  */
-app.post('/profile', async (req, res) => {});
+app.put('/profile', async (req, res) => {
+  const userData = req.body; // name, username, password.... anything can be changed
+});
 
 /**
  * @returns topic users, messages and all content based on id
