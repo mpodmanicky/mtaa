@@ -8,6 +8,8 @@ export const lightTheme = {
         text: "#ffffff",
         back: "#5182FF",
         icons: "#000000",
+        alert: "rgba(255,255,255,1)",
+        alertText: "rgb(0, 0, 0)",
     },
 };
 export const darkTheme = {
@@ -20,5 +22,7 @@ export const darkTheme = {
         text: "#ffffff",
         back: "#5182FF",
         icons: "#000000",
+        alert: "rgba(80, 85, 92, 1)",
+        alertText: "#fffffff",
     },
 };
