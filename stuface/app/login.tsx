@@ -16,11 +16,13 @@ import {
   TouchableOpacity,
 } from "react-native";
 import Inputs from "@/components/Inputs";
+import { useTheme } from "@/context/ThemeContex";
 
 export default function Login() {
   const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const { theme } = useTheme(); 
 
   return (
     <>
@@ -34,7 +36,7 @@ export default function Login() {
       />
       <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
         <ImageBackground
-          source={require("../assets/images/LoginScreenBackground.png")}
+          source={theme.colors.background}
           resizeMode="cover"
           style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
         >
@@ -69,6 +71,7 @@ export default function Login() {
                 fontWeight: "bold",
                 marginTop: 120,
                 marginBottom: 120,
+                color: theme.colors.text
               }}
             >
               STUFace

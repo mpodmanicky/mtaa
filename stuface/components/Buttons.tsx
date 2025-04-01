@@ -1,3 +1,4 @@
+import { useTheme } from "@/context/ThemeContex";
 import React from "react";
 import { View, StyleSheet, TouchableHighlight, Button, Text } from "react-native";
 
@@ -7,18 +8,20 @@ type buttonProps = {
 };
 
 function Buttons(props: buttonProps) {
+  const {theme} = useTheme();
+  const styles = dynamicStyles(theme);
   return (
     <View>
       <TouchableHighlight style={styles.button} onPress={props.onPress}>
-        <Text style={{ fontSize: 16, color: "white", textAlign: "center", padding: 10}}>{props.title}</Text>
+        <Text style={{ fontSize: 16, color: theme.colors.text, textAlign: "center", padding: 10}}>{props.title}</Text>
       </TouchableHighlight>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const dynamicStyles =(theme: any) => StyleSheet.create({
   button: {
-    backgroundColor: "#5182FF",
+    backgroundColor: theme.colors.secondary,
     borderRadius: 25,
     width: 150,
     margin: 25,
@@ -26,6 +29,9 @@ const styles = StyleSheet.create({
     shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.4,
     shadowRadius: 1,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    overflow: "hidden",
   },
 });
 
