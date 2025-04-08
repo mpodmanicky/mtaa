@@ -1,3 +1,4 @@
+import { useTheme } from '@/context/ThemeContex';
 import React from 'react'
 import { TextInput, StyleSheet } from 'react-native';
 
@@ -7,18 +8,23 @@ type inputProps = {
 }
 
 export default function Inputs( props: inputProps) {
+  const {theme} = useTheme();
+  const styles = dynamicStyles(theme)
   return (
     <TextInput style={styles.input} secureTextEntry={props.isPassword} placeholder={props.placeholder}>
     </TextInput>
   )
 }
 
-const styles = StyleSheet.create({
+const dynamicStyles = (theme: any) => StyleSheet.create({
     input: {
-        backgroundColor: "#B3E5EB",
+        backgroundColor: theme.colors.terniary,
+        overflow: "hidden",
+        borderWidth: 1,
+        color: theme.colors.text,
+        borderColor: theme.colors.border,
         padding: 10,
         borderRadius: 10,
-        elevation: 2,
         shadowColor: "#000",
         shadowOffset: { width: 1, height: 1 },
         shadowOpacity: 0.35,
