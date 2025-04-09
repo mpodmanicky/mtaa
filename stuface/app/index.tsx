@@ -1,41 +1,56 @@
-import { ImageBackground, ScrollView, Text, View } from "react-native";
+import { ImageBackground, SafeAreaView, ScrollView, Switch, Text, View } from "react-native";
 import Login from "./login";
 import { Stack, useRouter } from "expo-router";
 import Buttons from "@/components/Buttons";
+import { useTheme } from "@/context/ThemeContex";
 
 export default function Index() {
   const router = useRouter();
+  const { theme, toggleTheme } = useTheme();
   return (
-    <View style={{ flex: 1}}>
+    <View style={{ flex: 1 }}>
       <Stack.Screen
         options={{
           headerShown: false,
         }}
       />
       <ImageBackground
-        source={require("../assets/images/LoginScreenBackground.png")}
+        source={theme.colors.background}
         resizeMode="cover"
-        style={{ flex: 1, justifyContent:"center", alignItems: "center"}}
+        style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
       >
-        <View style={{flex: 1, alignItems:"center"}}>
-          <Text style={{fontSize: 32, fontWeight: "bold", marginTop: 150}}>STUFace</Text>
-          <View style={{flex: 1, justifyContent: "center", alignItems: "center"}}>
-            <Buttons title="Login" onPress={() => {
-              router.push({
-                pathname: "/login",
-              })
-            }}/>
+        <SafeAreaView>
+        <View>
+          <Switch value={theme === theme} onValueChange={toggleTheme} />
+        </View>
+        </SafeAreaView>
+        <View style={{ flex: 1, alignItems: "center" }}>
+          <Text style={{ fontSize: 32, fontWeight: "bold", marginTop: 150 }}>
+            STUFace
+          </Text>
+          <View
+            style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+          >
+            <Buttons
+              title="Login"
+              onPress={() => {
+                router.push({
+                  pathname: "/login",
+                });
+              }}
+            />
             <Text>OR</Text>
-            <Buttons title="Register" onPress={() => {
-              router.push({
-                pathname: "/register"
-              })
-            }} />
+            <Buttons
+              title="Register"
+              onPress={() => {
+                router.push({
+                  pathname: "/register",
+                });
+              }}
+            />
           </View>
         </View>
-
       </ImageBackground>
-
     </View>
   );
 }
