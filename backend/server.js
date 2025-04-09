@@ -105,6 +105,27 @@ app.post('/upload', upload.single('file'), async (req, res) => {
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
+//retrieve all uploads
+//Method: GET
+// URL: http://localhost:8080/uploads
+// Body: Not required.
+// Click Send.
+app.get('/uploads', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT u.*, us.username
+      FROM uploads u
+      LEFT JOIN users us ON u.user_id = us.id
+    `);
+    return res.status(200).json({
+      message: 'Uploads retrieved successfully',
+      uploads: result.rows
+    });
+  } catch (error) {
+    console.error('Error retrieving uploads:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
 // Getting information about the file by ID
 //Method: GET
 // URL: http://localhost:8080/upload/1 (replace 1 with the file ID from the uploads table).
