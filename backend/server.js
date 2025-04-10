@@ -105,6 +105,27 @@ app.post('/upload', upload.single('file'), async (req, res) => {
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
+//retrieve all uploads
+//Method: GET
+// URL: http://localhost:8080/uploads
+// Body: Not required.
+// Click Send.
+app.get('/uploads', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT u.*, us.username
+      FROM uploads u
+      LEFT JOIN users us ON u.user_id = us.id
+    `);
+    return res.status(200).json({
+      message: 'Uploads retrieved successfully',
+      uploads: result.rows
+    });
+  } catch (error) {
+    console.error('Error retrieving uploads:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
 // Getting information about the file by ID
 //Method: GET
 // URL: http://localhost:8080/upload/1 (replace 1 with the file ID from the uploads table).
@@ -202,6 +223,56 @@ app.delete('/upload/:id', async (req, res) => {
     return res.status(200).json({ message: 'File deleted successfully' });
   } catch (error) {
     console.error('Error deleting file:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+//replacement of a downloaded file
+//Method: PUT
+// URL: http://localhost:8080/upload/1 (replace 1 with the ID of an existing file from the uploads table).
+// Body tab → form-data:
+// Key: file, Type: File, select a new file (for example, new_image.png).
+// Click Send.
+app.put('/upload/:id', upload.single('file'), async (req, res) => {
+  const fileId = req.params.id;
+
+  try {
+    // Check if the file exists in the database
+    const existingFile = await pool.query(
+        'SELECT file_path FROM uploads WHERE id = $1',
+        [fileId]
+    );
+
+    if (existingFile.rows.length === 0) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+
+    // Check if a new file has been loaded
+    if (!req.file) {
+      return res.status(400).json({ error: 'No new file uploaded' });
+    }
+
+    // Delete the old file from the server
+    const oldFilePath = existingFile.rows[0].file_path;
+    if (fs.existsSync(oldFilePath)) {
+      fs.unlinkSync(oldFilePath);
+    }
+
+
+    const newFilePath = req.file.path;
+    const newFileType = req.file.mimetype;
+
+    // Update the record in the database
+    const result = await pool.query(
+        'UPDATE uploads SET file_path = $1, file_type = $2, upload_date = CURRENT_TIMESTAMP WHERE id = $3 RETURNING *',
+        [newFilePath, newFileType, fileId]
+    );
+
+    return res.status(200).json({
+      message: 'File updated successfully',
+      file: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Error updating file:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
