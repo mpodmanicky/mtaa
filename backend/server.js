@@ -117,6 +117,42 @@ function createTables() {
         );`)
       })
       .catch(err => console.error('Error creating tables:', err))
+      .then(() => {
+        // junction table users/topics
+        return pool.query(`
+          CREATE TABLE IF NOT EXISTS users_topics (
+          user_id INTEGER REFERENCES users(id),
+          topic_id INTEGER REFERENCES topics(id)
+        );`)
+      })
+      .catch(err => console.error('Error creating tables:', err))
+      .then(() => {
+        // junction table users/posts
+        return pool.query(`
+          CREATE TABLE IF NOT EXISTS user_posts (
+          user_id INTEGER REFERENCES users(id),
+          post_id INTEGER REFERENCES posts(id)
+        );`)
+      })
+      .catch(err => console.error('Error creating tables:', err))
+      .then(() => {
+        // junction table posts/comments
+        return pool.query(`
+          CREATE TABLE IF NOT EXISTS post_comments (
+          post_id INTEGER REFERENCES posts(id),
+          comment_id INTEGER REFERENCES comments(id)
+        );`)
+      })
+      .catch(err => console.error('Error creating tables:', err))
+      .then(() => {
+        // junction table comments/replies
+        return pool.query(`
+          CREATE TABLE IF NOT EXISTS comment_replies (
+          comment_id INTEGER REFERENCES comments(id),
+          reply_id INTEGER REFERENCES replies(id)
+        );`)
+      })
+      .catch(err => console.error('Error creating tables:', err))
 }
 
 setTimeout(() => {
