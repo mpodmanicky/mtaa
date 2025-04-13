@@ -517,6 +517,48 @@ app.post("/topic", async (req, res) => {
 });
 
 /**
+ * @returns Topic by id
+ *
+ */
+app.get("/topics/:id", async (req, res) => {
+  const topicId = req.params.id;
+  try {
+    const topicData = await pool.query(
+      "SELECT * FROM topics WHERE id = $1",
+      [topicId]
+    );
+    if (topicData.rows.length === 0) {
+      return res.status(404).json({ error: "Topic not found!" });
+    } else {
+      return res.status(200).json({ data: topicData.rows[0] });
+    }
+  } catch (e) {
+    console.error("Something went wrong when loading topic...", e);
+    return res.status(500).json({ error: "Internal server error!" });
+  }
+});
+
+/**
+ * @returns All topics
+ * User can see all topics
+ * He can filter them by name, owner, visibility
+ */
+app.get("/topics", async (req, res) => {
+  try {
+    const topics = await pool.query("SELECT * FROM topics");
+    if (topics.rows.length === 0) {
+      return res.status(404).json({ error: "No topics found!" });
+    } else {
+      return res.status(200).json({ data: topics.rows });
+    }
+  } catch (e) {
+    console.error("Something went wrong when loading topics...", e);
+    return res.status(500).json({ error: "Internal server error!" });
+  }
+});
+
+
+/**
  * @@description This endpoint enables users to create posts in a specific topic.
  * @returns Status code 200 with a success message if the post is created successfully.
  * @params request body containing topic_id, user_id, and content.
@@ -539,6 +581,23 @@ app.post("/post", async (req, res) => {
     }
   } catch (e) {
     console.error("Something went wrong when creating post...", e);
+    return res.status(500).json({ error: "Internal server error!" });
+  }
+});
+
+/**
+ * @returns All posts
+ */
+app.get("/posts", async (req, res) => {
+  try {
+    const posts = await pool.query("SELECT * FROM posts");
+    if (posts.rows.length === 0) {
+      return res.status(404).json({ error: "No posts found!" });
+    } else {
+      return res.status(200).json({ data: posts.rows });
+    }
+  } catch (e) {
+    console.error("Something went wrong when loading posts...", e);
     return res.status(500).json({ error: "Internal server error!" });
   }
 });
