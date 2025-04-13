@@ -81,7 +81,7 @@ function createTables() {
           id SERIAL PRIMARY KEY,
           name VARCHAR NOT NULL,
           owner_id INTEGER REFERENCES users(id),
-          visibility ENUM('public', 'private') DEFAULT 'public',
+          visibility varchar DEFAULT 'public',
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );`);
     })
