@@ -42,6 +42,7 @@ const upload = multer({
   fileFilter: fileFilter,
   limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
 });
+
 function createTables() {
   // table users
   pool.query(`
@@ -66,7 +67,92 @@ function createTables() {
         );
       `);
       })
-      .catch(err => console.error('Error creating tables:', err));
+      .catch(err => console.error('Error creating tables:', err))
+      .then(() => {
+        // table topics
+        return pool.query(`
+          CREATE TABLE IF NOT EXISTS topics (
+          id SERIAL PRIMARY KEY,
+          name VARCHAR NOT NULL,
+          owner_id INTEGER REFERENCES users(id),
+          visibility ENUM('public', 'private') DEFAULT 'public',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );`)
+      })
+      .catch(err => console.error('Error creating tables:', err))
+      .then(() => {
+        // table posts
+        return pool.query(`
+          CREATE TABLE IF NOT EXISTS posts (
+          id SERIAL PRIMARY KEY,
+          topic_id INTEGER REFERENCES topics(id),
+          user_id INTEGER REFERENCES users(id),
+          votes INTEGER DEFAULT 0,
+          content TEXT NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );`)
+      })
+      .catch(err => console.error('Error creating tables:', err))
+      .then(() => {
+        // table comments
+        return pool.query(`
+          CREATE TABLE IF NOT EXISTS comments (
+          id SERIAL PRIMARY KEY,
+          post_id INTEGER REFERENCES posts(id),
+          user_id INTEGER REFERENCES users(id),
+          content TEXT NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );`)
+      })
+      .catch(err => console.error('Error creating tables:', err))
+      .then(() => {
+        // table replies to comments
+        return pool.query(`
+          CREATE TABLE IF NOT EXISTS replies (
+          id SERIAL PRIMARY KEY,
+          comment_id INTEGER REFERENCES comments(id),
+          user_id INTEGER REFERENCES users(id),
+          content TEXT NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );`)
+      })
+      .catch(err => console.error('Error creating tables:', err))
+      .then(() => {
+        // junction table users/topics
+        return pool.query(`
+          CREATE TABLE IF NOT EXISTS users_topics (
+          user_id INTEGER REFERENCES users(id),
+          topic_id INTEGER REFERENCES topics(id)
+        );`)
+      })
+      .catch(err => console.error('Error creating tables:', err))
+      .then(() => {
+        // junction table users/posts
+        return pool.query(`
+          CREATE TABLE IF NOT EXISTS user_posts (
+          user_id INTEGER REFERENCES users(id),
+          post_id INTEGER REFERENCES posts(id)
+        );`)
+      })
+      .catch(err => console.error('Error creating tables:', err))
+      .then(() => {
+        // junction table posts/comments
+        return pool.query(`
+          CREATE TABLE IF NOT EXISTS post_comments (
+          post_id INTEGER REFERENCES posts(id),
+          comment_id INTEGER REFERENCES comments(id)
+        );`)
+      })
+      .catch(err => console.error('Error creating tables:', err))
+      .then(() => {
+        // junction table comments/replies
+        return pool.query(`
+          CREATE TABLE IF NOT EXISTS comment_replies (
+          comment_id INTEGER REFERENCES comments(id),
+          reply_id INTEGER REFERENCES replies(id)
+        );`)
+      })
+      .catch(err => console.error('Error creating tables:', err))
 }
 
 setTimeout(() => {
@@ -332,6 +418,39 @@ app.post('/login', async (req, res) => {
   }
 });
 
+app.get('/user/:id', async (req, res) => {
+  const userId = req.params.id;
+
+  try {
+    const userData = await pool.query("SELECT * FROM users WHERE id = $1", [userId]);
+    if (userData.rows.length === 0) {
+      return res.status(404).json({ error: "User not found!" });
+    } else {
+      return res.status(200).json({ data: userData.rows[0] });
+    }
+  } catch (e) {
+    console.error("Something went wrong when loading user...", e);
+    return res.status(500).json({ error: "Internal server error!" });
+  }
+})
+
+app.delete('/user/:id', async (req, res) => {
+  const userId = req.params.id;
+
+  try {
+    const userData = await pool.query("SELECT * FROM users WHERE id = $1", [userId]);
+    if (userData.rows.length === 0) {
+      return res.status(404).json({ error: "User not found!" });
+    } else {
+      await pool.query("DELETE FROM users WHERE id = $1", [userId]);
+      return res.status(200).json({ message: "User deleted successfully!" });
+    }
+  } catch (e) {
+    console.error("Something went wrong when deleting user...", e);
+    return res.status(500).json({ error: "Internal server error!" });
+  }
+})
+
 /**
  * @returns updated user profile
  * Users can update their profile information
@@ -366,7 +485,7 @@ app.get('/topic/:id', async (req, res) => {
  * @returns created topic with empty content
  * User creates his own topic and can set it up to be either public/private
  * He can invite people to his topic
- * 
+ *
  */
 app.post('/topic', async (req, res) => {
   const topicData = req.body;
@@ -378,24 +497,9 @@ app.post('/topic', async (req, res) => {
       return res.status(200).json({ message: `Topic ${topicData.topicName} successfully created` });
     } else {
       return res.status(409).json({ error: "User already has topic with the name created!" });
-      } 
+      }
   } catch (e) {
     console.error("Something went wrong when adding topic...", e);
     return res.status(500).json({ error: "Internal server error!" });
-  }
-});
-
-// simple get request to retrieve user with id 1 from the database, get usually works with uri not body
-app.get('/user', async (req, res) => {
-  try {
-    const user = await pool.query('SELECT * FROM users where id = 1;');
-    if (user.rows.length !== 0) {
-      return res.status(200).json({ message: 'User fetched', user: user.rows[0]})
-    } else {
-      return res.status(404).json({ error: 'User with this ID not found' });
-    }
-  } catch (error) {
-    console.error('Something went wrong while fetching user from db...', error);
-    return res.status(500).json({ message: 'Internal server error' });
   }
 });
