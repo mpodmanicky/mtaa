@@ -42,6 +42,7 @@ const upload = multer({
   fileFilter: fileFilter,
   limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
 });
+
 function createTables() {
   // table users
   pool.query(`
@@ -66,7 +67,56 @@ function createTables() {
         );
       `);
       })
-      .catch(err => console.error('Error creating tables:', err));
+      .catch(err => console.error('Error creating tables:', err))
+      .then(() => {
+        // table topics
+        return pool.query(`
+          CREATE TABLE IF NOT EXISTS topics (
+          id SERIAL PRIMARY KEY,
+          name VARCHAR NOT NULL,
+          owner_id INTEGER REFERENCES users(id),
+          visibility ENUM('public', 'private') DEFAULT 'public',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );`)
+      })
+      .catch(err => console.error('Error creating tables:', err))
+      .then(() => {
+        // table posts
+        return pool.query(`
+          CREATE TABLE IF NOT EXISTS posts (
+          id SERIAL PRIMARY KEY,
+          topic_id INTEGER REFERENCES topics(id),
+          user_id INTEGER REFERENCES users(id),
+          votes INTEGER DEFAULT 0,
+          content TEXT NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );`)
+      })
+      .catch(err => console.error('Error creating tables:', err))
+      .then(() => {
+        // table comments
+        return pool.query(`
+          CREATE TABLE IF NOT EXISTS comments (
+          id SERIAL PRIMARY KEY,
+          post_id INTEGER REFERENCES posts(id),
+          user_id INTEGER REFERENCES users(id),
+          content TEXT NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );`)
+      })
+      .catch(err => console.error('Error creating tables:', err))
+      .then(() => {
+        // table replies to comments
+        return pool.query(`
+          CREATE TABLE IF NOT EXISTS replies (
+          id SERIAL PRIMARY KEY,
+          comment_id INTEGER REFERENCES comments(id),
+          user_id INTEGER REFERENCES users(id),
+          content TEXT NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );`)
+      })
+      .catch(err => console.error('Error creating tables:', err))
 }
 
 setTimeout(() => {
