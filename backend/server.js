@@ -452,35 +452,30 @@ app.delete("/user/:id", async (req, res) => {
 });
 
 /**
+ * @description This endpoint returns all users
+ * @returns All users
+ */
+app.get("/users", async (req, res) => {
+  try {
+    const users = await pool.query("SELECT * FROM users");
+    if (users.rows.length === 0) {
+      return res.status(404).json({ error: "No users found!" });
+    } else {
+      return res.status(200).json({ data: users.rows });
+    }
+  } catch (e) {
+    console.error("Something went wrong when loading users...", e);
+    return res.status(500).json({ error: "Internal server error!" });
+  }
+});
+
+/**
  * @returns updated user profile
  * Users can update their profile information
  * put/patch/update
  */
 app.put("/profile", async (req, res) => {
   const userData = req.body; // name, username, password.... anything can be changed
-});
-
-/**
- * @returns topic users, messages and all content based on id
- * User clicks on desired topic
- * Topic loads along with user posts and content
- */
-app.get("/topic/:id", async (req, res) => {
-  const topicId = req.params.id;
-
-  try {
-    const topicData = await pool.query(
-      "SELECT username, topics.name, posts.content, comments.content, replies.content FROM users JOIN "
-    ); // potrebujeme vybrat vsetky data, cize posty, k postom komentare, ich hodnotenie atd atd atd...
-    if (topicData.rows.length === 0) {
-      return res.status(200).json({ message: "Be the first to post!" });
-    } else {
-      return res.status(200).json({ data: topicData }); // posleme tonu udajov musime tam porobit spravne joiny aby to vsetko sedelo lebo s nami bude amen
-    }
-  } catch (e) {
-    console.error("Something went wrong when loading topic...", e);
-    return res.status(500).json({ error: "Internal server error!" });
-  }
 });
 
 /**
@@ -598,6 +593,31 @@ app.get("/posts", async (req, res) => {
     }
   } catch (e) {
     console.error("Something went wrong when loading posts...", e);
+    return res.status(500).json({ error: "Internal server error!" });
+  }
+});
+
+/**
+ * @description This endpoint allows users to delete their posts.
+ * @returns Status code 200 with a success message if the post is deleted successfully.
+ * @params request body containing post_id.
+*/
+
+app.delete("/post/:id", async (req, res) => {
+  const postId = req.params.id;
+
+  try {
+    const post = await pool.query("SELECT * FROM posts WHERE id = $1", [
+      postId,
+    ]);
+    if (post.rows.length === 0) {
+      return res.status(404).json({ error: "Post not found!" });
+    } else {
+      await pool.query("DELETE FROM posts WHERE id = $1", [postId]);
+      return res.status(200).json({ message: "Post deleted successfully!" });
+    }
+  } catch (e) {
+    console.error("Something went wrong when deleting post...", e);
     return res.status(500).json({ error: "Internal server error!" });
   }
 });
