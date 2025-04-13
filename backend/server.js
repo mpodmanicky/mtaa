@@ -126,33 +126,6 @@ function createTables() {
         );`)
       })
       .catch(err => console.error('Error creating tables:', err))
-      .then(() => {
-        // junction table users/posts
-        return pool.query(`
-          CREATE TABLE IF NOT EXISTS user_posts (
-          user_id INTEGER REFERENCES users(id),
-          post_id INTEGER REFERENCES posts(id)
-        );`)
-      })
-      .catch(err => console.error('Error creating tables:', err))
-      .then(() => {
-        // junction table posts/comments
-        return pool.query(`
-          CREATE TABLE IF NOT EXISTS post_comments (
-          post_id INTEGER REFERENCES posts(id),
-          comment_id INTEGER REFERENCES comments(id)
-        );`)
-      })
-      .catch(err => console.error('Error creating tables:', err))
-      .then(() => {
-        // junction table comments/replies
-        return pool.query(`
-          CREATE TABLE IF NOT EXISTS comment_replies (
-          comment_id INTEGER REFERENCES comments(id),
-          reply_id INTEGER REFERENCES replies(id)
-        );`)
-      })
-      .catch(err => console.error('Error creating tables:', err))
 }
 
 setTimeout(() => {
@@ -469,7 +442,7 @@ app.get('/topic/:id', async (req, res) => {
   const topicId = req.params.id;
 
   try {
-    const topicData = await pool.query("") // potrebujeme vybrat vsetky data, cize posty, k postom komentare, ich hodnotenie atd atd atd...
+    const topicData = await pool.query("SELECT username, topics.name, posts.content, comments.content, replies.content FROM users JOIN ") // potrebujeme vybrat vsetky data, cize posty, k postom komentare, ich hodnotenie atd atd atd...
     if(topicData.rows.length === 0) {
       return res.status(200).json({ message: "Be the first to post!" });
     } else {
@@ -482,7 +455,7 @@ app.get('/topic/:id', async (req, res) => {
 });
 
 /**
- * @returns created topic with empty content
+ * @returns created empty topic
  * User creates his own topic and can set it up to be either public/private
  * He can invite people to his topic
  *
@@ -493,7 +466,7 @@ app.post('/topic', async (req, res) => {
   try {
     const userAlreadyHasTopic = await pool.query("Select * from topics where name = $1 and owner_id = $2", [topicData.topicName, topicData.user_id]);
     if(userAlreadyHasTopic.rows.length === 0) {
-      await pool.query("INSERT INTO topics (name, owner_id, private) VALUES ($1, $2, $3)", [topicData.topicName, topicData.user_id, topicData.isPrivate]);
+      await pool.query("INSERT INTO topics (name, owner_id, visibility) VALUES ($1, $2, $3)", [topicData.topicName, topicData.user_id, topicData.isPrivate]);
       return res.status(200).json({ message: `Topic ${topicData.topicName} successfully created` });
     } else {
       return res.status(409).json({ error: "User already has topic with the name created!" });
