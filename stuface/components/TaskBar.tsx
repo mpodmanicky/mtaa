@@ -1,50 +1,96 @@
-import React from 'react'
-import { Text, StyleSheet } from "react-native";
+import React from 'react';
+import { StyleSheet, TouchableOpacity, View, Platform } from "react-native";
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '@/context/ThemeContex';
+import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 
 /**
- * Component representing navigation bar
+ * Component representing iOS-style navigation bar
  * Fixed to the bottom of the screen
  */
-export default function TaskBar() {
+export default function TaskBar({ state, descriptors, navigation }: BottomTabBarProps) {
+  const { theme } = useTheme();
+  const styles = dynamicStyles(theme);
+
   return (
-    <>
-    /**home, topics, chat, new post and profile */
-    <Text style={styles.icons}>
-        <Ionicons name="home" size={24} color="black" />
-        <Ionicons name="book" size={24} color="black" />
-        <Ionicons name="add-circle" size={24} color="black" />
-        <Ionicons name="chatbubbles" size={24} color="black" />
-        <Ionicons name="person" size={24} color="black" />
-    </Text>
-    </>
-  )
+    <View style={styles.container}>
+      {state.routes.map((route, index) => {
+        const { options } = descriptors[route.key];
+        const isFocused = state.index === index;
+
+        const onPress = () => {
+          const event = navigation.emit({
+            type: 'tabPress',
+            target: route.key,
+            canPreventDefault: true,
+          });
+
+          if (!isFocused && !event.defaultPrevented) {
+            navigation.navigate(route.name);
+          }
+        };
+
+        const iconName = getIconName(route.name, isFocused);
+
+        return (
+          <TouchableOpacity
+            key={route.key}
+            style={styles.tabButton}
+            onPress={onPress}
+            accessibilityRole="button"
+            accessibilityState={isFocused ? { selected: true } : {}}
+          >
+            <Ionicons
+              name={iconName}
+              size={24}
+              color={isFocused ? theme?.colors.primary || "#405DE6" : "#8E8E93"}
+            />
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
 }
 
-const styles = StyleSheet.create({
-    icons: {
-        padding: 10,
-        margin: 10,
-        color: "black",
-        backgroundColor: "white",
-        borderRadius: 10,
-        opacity: 0.8,
-        flexDirection: "row",
-        justifyContent: "space-around",
-        alignItems: "center",
-        position: "absolute",
-        bottom: 0,
-        left: 0,
-        right: 0,
-        height: 60,
-        shadowColor: "#000",
-        shadowOffset: {
-            width: 0,
-            height: 2,
-        },
-        shadowOpacity: 0.25,
-        shadowRadius: 3.84,
-        elevation: 5,
-        zIndex: 1,
-    },
-})
+const getIconName = (routeName: string, isFocused: boolean) => {
+  switch (routeName) {
+    case 'home':
+      return isFocused ? "home" : "home-outline";
+    case 'search':
+      return isFocused ? "search" : "search-outline";
+    case 'create':
+      return isFocused ? "add-circle" : "add-circle-outline";
+    case 'chat':
+      return isFocused ? "chatbubbles" : "chatbubbles-outline";
+    case 'profile':
+      return isFocused ? "person" : "person-outline";
+    default:
+      return "help-circle-outline";
+  }
+};
+
+const dynamicStyles = (theme: any) => StyleSheet.create({
+  container: {
+    flexDirection: "row",
+    backgroundColor: "#FFFFFF",
+    borderTopWidth: 0.5,
+    borderTopColor: "#D1D1D6",
+    justifyContent: "space-around",
+    alignItems: "center",
+    height: Platform.OS === 'ios' ? 85 : 65, // Extra height for iOS
+    paddingBottom: Platform.OS === 'ios' ? 25 : 0, // Safe area for iOS
+    width: '100%',
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 999,
+  },
+  tabButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: '100%',
+    paddingTop: 10,
+  }
+});

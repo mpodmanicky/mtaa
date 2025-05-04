@@ -1,5 +1,6 @@
 import { ThemeProvider } from "@/context/ThemeContex";
 import { Stack } from "expo-router";
+import React from "react";
 import { useEffect, useState } from "react";
 import { Platform, StatusBar } from "react-native";
 export default function RootLayout() {
