@@ -20,7 +20,7 @@ export default function PillBox(props: boxProps) {
 
 const dynamicStyles = (theme: any) => StyleSheet.create({
   pillBox: {
-    backgroundColor: theme.colors.secondary,
+    backgroundColor: theme.colors.primary,
     width: 310,
     height: 98,
     paddingHorizontal: 12,
