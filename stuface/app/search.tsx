@@ -11,7 +11,7 @@ export default function SearchScreen() {
       resizeMode="cover"
       style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
     >
-      <Text style={{ color: theme.colors.text, fontSize: 24 }}>Topics Screen</Text>
+      <Text style={{ color: theme.colors.text, fontSize: 24 }}>Search Screen</Text>
     </ImageBackground>
   );
 }
