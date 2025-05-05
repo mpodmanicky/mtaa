@@ -1,6 +1,7 @@
 import PillBox from "@/components/PillBox";
 import { useTheme } from "@/context/ThemeContex";
 import { Stack, useRouter } from "expo-router";
+import { Text } from "react-native";
 import React from "react";
 import {
   ImageBackground,
@@ -77,5 +78,13 @@ export default function Home() {
 const dynamicStyles = (theme: any) => ({
   pillWrapper: {
     margin: 10,
-  }
+  },
+  headerText: {
+    marginTop: 50,
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    color: theme.colors.text,
+    alignSelf: 'flex-start'
+  },
 });

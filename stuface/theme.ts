@@ -2,7 +2,7 @@ export const lightTheme = {
     colors: {
         background: require('@/assets/images/NormalBackground.png'),
         primary: "rgba(48,78,153, 1.0)",
-        secondary: "rgba(81, 130, 255, 0.6)",
+        secondary: "rgba(81, 130, 255, 1.0)",
         terniary: "rgba(178, 229, 235, 1.0)",
         border: "rgba(255, 255, 255, 0.2)",
         text: "#ffffff",
