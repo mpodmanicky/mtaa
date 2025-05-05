@@ -10,10 +10,20 @@ import {
 } from 'react-native';
 import { useTheme } from '@/context/ThemeContex';
 import ChatPill from '@/components/ChatPill';
+import { router } from 'expo-router';
 
 export default function ChatScreen() {
   const { theme } = useTheme();
   const styles = dynamicStyles(theme);
+  const navigateToMessages = (conversationId: string, username: string) => {
+    router.push({
+      pathname: '/messages',
+      params: {
+        conversationId: conversationId,
+        username: username
+      }
+    })
+  }
 
   return (
     <ImageBackground
@@ -32,7 +42,7 @@ export default function ChatScreen() {
             time="10:30 AM"
             avatar={require('@/assets/images/react-logo.png')}
             unread={true}
-            onPress={() => {}}
+            onPress={() => navigateToMessages('1', 'John Doe')}
           />
           {/* Add more <ChatPill /> items here */}
         </ScrollView>

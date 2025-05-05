@@ -9,7 +9,8 @@ import {
   StyleSheet,
   SafeAreaView,
   Text,
-  StatusBar
+  StatusBar,
+  Platform
 } from "react-native";
 
 export default function Home() {
@@ -107,6 +108,6 @@ const dynamicStyles = (theme: any) => StyleSheet.create({
     },
     topics: {
       flex: 1,
-      marginTop: 70,
+      marginTop: Platform === "iOS" ? 0: 70,
     }
 });
