@@ -43,26 +43,32 @@ export default function MessagesScreen() {
 
   // Setup WebSocket connection
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || !conversationId) return;
 
-    // Connect to WebSocket server
-    const wsUrl = `ws://localhost:8082/chat?userId=${userId}`;
+    // Connect to WebSocket server with proper URL
+    // (update with your actual server address when running on a device)
+    const wsUrl = `ws://127.0.0.1:8080/chat?userId=${userId}`;
     ws.current = new WebSocket(wsUrl);
 
     ws.current.onopen = () => {
       console.log('WebSocket connection established');
+
+      // Load previous messages
+      fetchMessages();
     };
 
     ws.current.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        if (data.type === 'message') {
+        console.log('Received message:', data);
+
+        if (data.type === 'message' && data.conversationId === conversationId) {
           const newMessage: Message = {
             id: data.id || Date.now().toString(),
             text: data.text,
             sender: data.sender,
             timestamp: data.timestamp || Date.now(),
-            isMine: data.sender === userId
+            isMine: data.isMine
           };
 
           setMessages(prevMessages => [...prevMessages, newMessage]);
@@ -91,38 +97,39 @@ export default function MessagesScreen() {
         ws.current.close();
       }
     };
-  }, [userId]);
+  }, [userId, conversationId]);
+
+  // Add a function to fetch previous messages
+  const fetchMessages = async () => {
+    if (!userId || !conversationId) return;
+
+    try {
+      const response = await fetch(`http://127.0.0.1:8080/conversations/${conversationId}/messages/${userId}`);
+      const result = await response.json();
+
+      if (response.ok && result.data) {
+        setMessages(result.data);
+      }
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+    }
+  };
 
   // Send message function
   const sendMessage = () => {
-    if (!messageText.trim() || !ws.current || !userId) return;
-
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      text: messageText,
-      sender: userId,
-      timestamp: Date.now(),
-      isMine: true
-    };
-
-    // Add message to local state
-    setMessages(prevMessages => [...prevMessages, newMessage]);
+    if (!messageText.trim() || !ws.current || !userId || !conversationId) return;
 
     // Send message through WebSocket
     const messagePayload = {
       type: 'message',
       text: messageText,
       sender: userId,
+      conversationId: conversationId,
       timestamp: Date.now()
     };
 
     ws.current.send(JSON.stringify(messagePayload));
     setMessageText('');
-
-    // Scroll to bottom on new message
-    setTimeout(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: true });
-    }, 100);
   };
 
   // Format timestamp to readable time
@@ -208,7 +215,10 @@ export default function MessagesScreen() {
             <View style={styles.inputContainer}>
               <View style={styles.inputWrapper}>
                 <Inputs
+                {/**Have to fix the inputs */}
                   placeholder="Type a message..."
+                  value={messageText}
+                  onChangeText={setMessageText}
                   isPassword={false}
                 />
               </View>
