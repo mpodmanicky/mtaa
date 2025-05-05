@@ -13,12 +13,28 @@ import {
 import { useTheme } from '@/context/ThemeContex';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function SettingsScreen() {
   const { theme, toggleTheme } = useTheme();
   const router = useRouter();
   const styles = dynamicStyles(theme);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [username, setUsername] = useState('John Doe'); // Example username
+
+  // load username from AsyncStorage
+  async function loadUsername() {
+    try {
+      const value = await AsyncStorage.getItem('username');
+      if (value !== null) {
+        setUsername(value);
+      } else {
+        setUsername('John Doe'); // Default value if not found
+      }
+    } catch (e) {
+      console.log(e);
+    }
+  }
 
   return (
     <ImageBackground
