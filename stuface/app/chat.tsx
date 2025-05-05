@@ -1,17 +1,69 @@
 import React from 'react';
-import { View, Text, ImageBackground } from 'react-native';
+import {
+  View,
+  Text,
+  ImageBackground,
+  StyleSheet,
+  SafeAreaView,
+  ScrollView,
+  StatusBar
+} from 'react-native';
 import { useTheme } from '@/context/ThemeContex';
+import ChatPill from '@/components/ChatPill';
 
-export default function SearchScreen() {
+export default function ChatScreen() {
   const { theme } = useTheme();
+  const styles = dynamicStyles(theme);
 
   return (
     <ImageBackground
       source={theme.colors.background}
       resizeMode="cover"
-      style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+      style={styles.background}
     >
-      <Text style={{ color: theme.colors.text, fontSize: 24 }}>Chat Screen</Text>
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.header}>
+          <Text style={styles.headerText}>Chat</Text>
+        </View>
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <ChatPill
+            username="John Doe"
+            lastMessage="Hey, how are you?"
+            time="10:30 AM"
+            avatar={require('@/assets/images/react-logo.png')}
+            unread={true}
+            onPress={() => {}}
+          />
+          {/* Add more <ChatPill /> items here */}
+        </ScrollView>
+      </SafeAreaView>
     </ImageBackground>
   );
 }
+
+const dynamicStyles = (theme: any) =>
+  StyleSheet.create({
+    background: {
+      flex: 1,
+      width: '100%',
+      height: '100%',
+    },
+    safeArea: {
+      flex: 1,
+      width: '100%',
+      paddingTop: StatusBar.currentHeight || 10,
+    },
+    header: {
+      paddingHorizontal: 20,
+      paddingBottom: 10,
+    },
+    headerText: {
+      fontSize: 32,
+      fontWeight: 'bold',
+      color: theme.colors.text,
+    },
+    scrollContent: {
+      paddingHorizontal: 10,
+      paddingBottom: 20,
+    },
+  });
