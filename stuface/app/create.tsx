@@ -1,16 +1,56 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, ImageBackground, StyleSheet, SafeAreaView, Platform, TouchableOpacity, ScrollView } from 'react-native';
 import { useTheme } from '@/context/ThemeContex';
 import Inputs from '@/components/Inputs';
 import { Ionicons } from '@expo/vector-icons';
 import Buttons from '@/components/Buttons';
 import { Stack } from 'expo-router';
+import * as Location from 'expo-location';
 
 export default function CreateScreen() {
   const { theme } = useTheme();
   const styles = dynamicStyles(theme);
   const [selectedCategory, setSelectedCategory] = useState('general');
   const [postText, setPostText] = useState('');
+  const [location, setLocation] = useState<Location.LocationObject | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string>(null);
+  const [placeName, setPlaceName] = useState<string | null>(null);
+
+  async function getCurrentLocation() {
+    let { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') {
+      setErrorMsg('Permission to access location was denied');
+      return;
+    }
+
+    let location = await Location.getCurrentPositionAsync({});
+    setLocation(location);
+
+    const place = await getPlaceName(location.coords.latitude, location.coords.longitude);
+    setPlaceName(place);
+  }
+  let text = 'Waiting...';
+  if(errorMsg) {
+    text = errorMsg;
+  } else if (location) {
+    text = JSON.stringify(location);
+  }
+
+  async function getPlaceName(latitude: number, longitude: number) {
+    try {
+      const geocodedLocation = await Location.reverseGeocodeAsync({
+        latitude, longitude
+      });
+      if (geocodedLocation && geocodedLocation.length > 0) {
+        const place = geocodedLocation[0];
+        return place.city + ', ' + place.country;
+      }
+    } catch (e) {
+      console.error(e);
+      return null;
+    }
+  }
+
 
   const categories = [
     { label: 'General', value: 'general' },
@@ -35,7 +75,7 @@ export default function CreateScreen() {
             {/* Text Input Area */}
             <View >
               <Inputs
-                placeholder="What's on your mind?"
+                placeholder={placeName}
                 isPassword={false}
               />
             </View>
@@ -50,10 +90,13 @@ export default function CreateScreen() {
                 <TouchableOpacity style={styles.iconButton}>
                   <Ionicons name="image" size={28} color={theme.colors.primary} />
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.iconButton}>
-                  <Ionicons name="attach" size={28} color={theme.colors.primary} />
+                <TouchableOpacity style={styles.iconButton} onPress={ () => getCurrentLocation()}>
+                  <Ionicons name="location-outline" size={28} color={theme.colors.primary} />
                 </TouchableOpacity>
               </View>
+              {/* <View>
+                <Text>{text}</Text>
+              </View> */}
 
               {/* Post button */}
               <View style={styles.buttonContainer}>
