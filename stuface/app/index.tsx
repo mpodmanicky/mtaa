@@ -2,7 +2,7 @@ import { ImageBackground,  Text, View } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import Buttons from "@/components/Buttons";
 import { useTheme } from "@/context/ThemeContex";
-import React from "react";
+import React, { useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function Index() {
@@ -29,6 +29,7 @@ export default function Index() {
       console.log(e);
     }
   }
+  // wrap the loadLoginData function in a useEffect to call it when the component mounts or add loading
   return (
     <View style={{ flex: 1 }}>
       <Stack.Screen
@@ -47,7 +48,7 @@ export default function Index() {
         </View>
         </SafeAreaView> */}
         <View style={{ flex: 1, alignItems: "center" }}>
-          <Text style={{ fontSize: 32, fontWeight: "bold", marginTop: 150 }}>
+          <Text style={{ color: theme.colors.text, fontSize: 32, fontWeight: "bold", marginTop: 150 }}>
             STUFace
           </Text>
           <View

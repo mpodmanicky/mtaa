@@ -35,6 +35,7 @@ export default function SettingsScreen() {
       console.log(e);
     }
   }
+
   return (
     <ImageBackground
       source={theme.colors.background}
