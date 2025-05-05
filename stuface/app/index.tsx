@@ -3,10 +3,32 @@ import { Stack, useRouter } from "expo-router";
 import Buttons from "@/components/Buttons";
 import { useTheme } from "@/context/ThemeContex";
 import React from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function Index() {
   const router = useRouter();
-  const { theme, toggleTheme } = useTheme();
+  const { theme } = useTheme();
+
+  async function setUsername(value: string) {
+    try {
+      await AsyncStorage.setItem("username", value);
+    } catch (e) {
+      console.log(e);
+    }
+  }
+  async function loadLoginData() {
+    try {
+      const value = await AsyncStorage.getItem("loginData");
+      if (value !== null) {
+        // We have data!!
+        const parsedValue = JSON.parse(value);
+        console.log(parsedValue);
+        // Use the parsed value as needed
+      }
+    } catch (e) {
+      console.log(e);
+    }
+  }
   return (
     <View style={{ flex: 1 }}>
       <Stack.Screen
