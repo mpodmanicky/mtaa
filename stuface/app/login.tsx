@@ -41,6 +41,58 @@ export default function Login() {
     }
   }
 
+  async function login() {
+    // first set username and password
+    if(password !== "" && username !== "") {
+      // testing
+      saveLoginData({ username: username, password: password });
+      updateUsername(username);
+      return router.push({
+        pathname: "/home",
+      })
+    }
+
+    fetch('http://localhost:8080/login', {
+      method: "POST",
+      body: JSON.stringify({ username: username, password: password }),
+    })
+    .then((response) => {
+      if(response.status === 200) {
+        return response.json()
+      } else {
+        // wihtout backend login
+        if(username === "test" && password === "test") {
+
+        saveLoginData({ username: username, password: password });
+        updateUsername(username);
+        router.push({
+          pathname: "/home",
+        });
+      }
+      }
+    })
+    .then((data) => {
+      console.log(data);
+      saveLoginData(data)
+      updateUsername(data.username);
+      router.push({
+        pathname: "/home",
+      });
+    })
+    .catch((e) => {
+      console.log(e);
+      // wihtout backend login
+      if(username === "test" && password === "test") {
+        saveLoginData({ username: username, password: password });
+        updateUsername(username);
+        router.push({
+          pathname: "/home",
+        });
+        return;
+      }
+    })
+  }
+
   return (
     <>
       {/*TouchableWithoutFeedback nemoze mat viac ako jedno dieta takze pouzivame <></> */}
@@ -93,12 +145,10 @@ export default function Login() {
             >
               STUFace
             </Text>
-            <Inputs placeholder="Username" isPassword={false}/>
-            <Inputs placeholder="Password" isPassword={true}/>
+            <Inputs placeholder="Username" isPassword={false} value={username} onChangeText={setUsername}/>
+            <Inputs placeholder="Password" isPassword={true} value={password} onChangeText={setPassword}/>
             <Buttons title="Login" onPress={() => {
-              router.push({
-                pathname: '/home',
-              })
+              login();
             }} />
             <Text>OR</Text>
             <Buttons title="Register" onPress={() => {

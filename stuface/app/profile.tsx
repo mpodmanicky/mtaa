@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -14,11 +14,13 @@ import { useTheme } from "@/context/ThemeContex";
 import { Stack, useRouter } from "expo-router";
 import PillBox from "@/components/PillBox";
 import Buttons from "@/components/Buttons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function ProfileScreen() {
   const { theme } = useTheme();
   const styles = getStyles(theme);
   const router = useRouter();
+  const [username, setUsername] = useState<string | null>(null);
 
   const pills = ["Personal Info", "Settings", "Saved"];
   const routeMap: Record<string, string> = {
@@ -26,6 +28,19 @@ export default function ProfileScreen() {
     Settings: "settings",
     Saved: "saved",
   };
+
+  useEffect(() => {
+    const loadUsername = async () => {
+      try {
+        const storedUsername = await AsyncStorage.getItem("username");
+        setUsername(storedUsername);
+      } catch (error) {
+        console.error("Error loading username:", error);
+      }
+    };
+
+    loadUsername();
+  }, [])
 
   return (
     <>
@@ -38,7 +53,7 @@ export default function ProfileScreen() {
         <SafeAreaView style={styles.safeArea}>
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.headerText}>Username</Text>
+            <Text style={styles.headerText}>{username}</Text>
           </View>
 
           {/* Content */}
