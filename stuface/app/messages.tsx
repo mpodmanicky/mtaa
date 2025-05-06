@@ -1,5 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { SafeAreaView, View, ScrollView, Text, StyleSheet, ImageBackground, TouchableOpacity, KeyboardAvoidingView, Platform, StatusBar } from 'react-native';
+import {
+  SafeAreaView,
+  View,
+  ScrollView,
+  Text,
+  StyleSheet,
+  ImageBackground,
+  TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
+  StatusBar,
+} from 'react-native';
 import { useTheme } from '@/context/ThemeContex';
 import { Stack } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -68,10 +79,10 @@ export default function MessagesScreen() {
             text: data.text,
             sender: data.sender,
             timestamp: data.timestamp || Date.now(),
-            isMine: data.isMine
+            isMine: data.isMine,
           };
 
-          setMessages(prevMessages => [...prevMessages, newMessage]);
+          setMessages((prevMessages) => [...prevMessages, newMessage]);
 
           // Scroll to bottom on new message
           setTimeout(() => {
@@ -104,7 +115,9 @@ export default function MessagesScreen() {
     if (!userId || !conversationId) return;
 
     try {
-      const response = await fetch(`http://127.0.0.1:8080/conversations/${conversationId}/messages/${userId}`);
+      const response = await fetch(
+        `http://127.0.0.1:8080/conversations/${conversationId}/messages/${userId}`
+      );
       const result = await response.json();
 
       if (response.ok && result.data) {
@@ -117,7 +130,8 @@ export default function MessagesScreen() {
 
   // Send message function
   const sendMessage = () => {
-    if (!messageText.trim() || !ws.current || !userId || !conversationId) return;
+    if (!messageText.trim() || !ws.current || !userId || !conversationId)
+      return;
 
     // Send message through WebSocket
     const messagePayload = {
@@ -125,7 +139,7 @@ export default function MessagesScreen() {
       text: messageText,
       sender: userId,
       conversationId: conversationId,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
 
     ws.current.send(JSON.stringify(messagePayload));
@@ -147,22 +161,22 @@ export default function MessagesScreen() {
           text: 'Hey there! How are you?',
           sender: 'user2',
           timestamp: Date.now() - 3600000,
-          isMine: false
+          isMine: false,
         },
         {
           id: '2',
-          text: 'I\'m good, thanks! How about you?',
+          text: "I'm good, thanks! How about you?",
           sender: 'user1',
           timestamp: Date.now() - 3500000,
-          isMine: true
+          isMine: true,
         },
         {
           id: '3',
-          text: 'I\'m doing great! Want to meet up later?',
+          text: "I'm doing great! Want to meet up later?",
           sender: 'user2',
           timestamp: Date.now() - 3400000,
-          isMine: false
-        }
+          isMine: false,
+        },
       ];
 
       setMessages(mockMessages);
@@ -180,8 +194,11 @@ export default function MessagesScreen() {
         <SafeAreaView style={styles.safeArea}>
           {/* Header */}
           <View style={styles.header}>
-            <TouchableOpacity onPress={() => router.push("/chat")} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={24} color={"white"} />
+            <TouchableOpacity
+              onPress={() => router.push('/chat')}
+              style={styles.backButton}
+            >
+              <Ionicons name="arrow-back" size={24} color={'white'} />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>{username}</Text>
           </View>
@@ -190,23 +207,28 @@ export default function MessagesScreen() {
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={styles.keyboardAvoidingView}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? -40 : 0}
           >
             <ScrollView
               ref={scrollViewRef}
               style={styles.messagesContainer}
               contentContainerStyle={styles.messagesList}
-              onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+              onContentSizeChange={() =>
+                scrollViewRef.current?.scrollToEnd({ animated: true })
+              }
             >
               {messages.map((message) => (
                 <View
                   key={message.id}
                   style={[
                     styles.messageBubble,
-                    message.isMine ? styles.myMessage : styles.theirMessage
+                    message.isMine ? styles.myMessage : styles.theirMessage,
                   ]}
                 >
                   <Text style={styles.messageText}>{message.text}</Text>
-                  <Text style={styles.messageTime}>{formatTime(message.timestamp)}</Text>
+                  <Text style={styles.messageTime}>
+                    {formatTime(message.timestamp)}
+                  </Text>
                 </View>
               ))}
             </ScrollView>
@@ -214,10 +236,7 @@ export default function MessagesScreen() {
             {/* Message input area */}
             <View style={styles.inputContainer}>
               <View style={styles.inputWrapper}>
-                <Inputs
-                  placeholder="Type a message..."
-                  isPassword={false}
-                />
+                <Inputs placeholder="Type a message..." isPassword={false} />
               </View>
               <TouchableOpacity
                 style={styles.sendButton}
@@ -227,7 +246,11 @@ export default function MessagesScreen() {
                 <Ionicons
                   name="send"
                   size={24}
-                  color={messageText.trim() ? theme.colors.primary : theme.colors.text}
+                  color={
+                    messageText.trim()
+                      ? theme.colors.primary
+                      : theme.colors.text
+                  }
                 />
               </TouchableOpacity>
             </View>
@@ -239,100 +262,104 @@ export default function MessagesScreen() {
 }
 
 // Dynamic styles based on theme
-const dynamicStyles = (theme: any) => StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  safeArea: {
-    flex: 1,
-    width: '100%',
-    paddingTop: StatusBar.currentHeight || 10,
-  },
-  keyboardAvoidingView: {
-    flex: 1,
-  },
-  header: {
-    paddingHorizontal: 20,
-    paddingBottom: 10,
-    flexDirection: 'row',
-    width: '100%',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  backButton: {
-    position: "absolute",
-    top: 20,
-    left: 20,
-    zIndex: 1,
-    padding: 8,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#5182FF",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "black",
-    shadowOffset: { width: 1, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 1,
-  },
-  headerTitle: {
-    marginTop: 40,
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: theme.colors.text,
-    textAlign: 'center',
-    flex: 1,
-  },
-  messagesContainer: {
-    flex: 1,
-    padding: 16,
-  },
-  messagesList: {
-    paddingBottom: 16,
-  },
-  messageBubble: {
-    maxWidth: '75%',
-    padding: 12,
-    borderRadius: 20,
-    marginBottom: 8,
-  },
-  myMessage: {
-    alignSelf: 'flex-end',
-    backgroundColor: theme.colors.primary,
-    borderBottomRightRadius: 4,
-  },
-  theirMessage: {
-    alignSelf: 'flex-start',
-    backgroundColor: theme.colors.secondary,
-    borderBottomLeftRadius: 4,
-  },
-  messageText: {
-    color: theme.colors.text,
-    fontSize: 16,
-  },
-  messageTime: {
-    fontSize: 12,
-    color: theme.colors.text,
-    alignSelf: 'flex-end',
-    marginTop: 4,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 8,
-  },
-  inputWrapper: {
-    flex: 1,
-    marginRight: 8,
-  },
-  sendButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: theme.colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-});
+const dynamicStyles = (theme: any) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+    },
+    safeArea: {
+      flex: 1,
+      width: '100%',
+      paddingTop: StatusBar.currentHeight || 10,
+    },
+    keyboardAvoidingView: {
+      flex: 1,
+    },
+    header: {
+      paddingHorizontal: 20,
+      paddingBottom: 10,
+      flexDirection: 'row',
+      width: '100%',
+      alignItems: 'center',
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    backButton: {
+      position: 'absolute',
+      top: 20,
+      left: 20,
+      zIndex: 1,
+      padding: 8,
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: '#5182FF',
+      justifyContent: 'center',
+      alignItems: 'center',
+      shadowColor: 'black',
+      shadowOffset: { width: 1, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 1,
+    },
+    headerTitle: {
+      marginTop: 40,
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: theme.colors.text,
+      textAlign: 'center',
+      flex: 1,
+    },
+    messagesContainer: {
+      flex: 1,
+      padding: 16,
+    },
+    messagesList: {
+      paddingBottom: 16,
+    },
+    messageBubble: {
+      maxWidth: '75%',
+      padding: 12,
+      borderRadius: 20,
+      marginBottom: 8,
+    },
+    myMessage: {
+      alignSelf: 'flex-end',
+      backgroundColor: theme.colors.primary,
+      borderBottomRightRadius: 4,
+    },
+    theirMessage: {
+      alignSelf: 'flex-start',
+      backgroundColor: theme.colors.secondary,
+      borderBottomLeftRadius: 4,
+    },
+    messageText: {
+      color: theme.colors.text,
+      fontSize: 16,
+    },
+    messageTime: {
+      fontSize: 12,
+      color: theme.colors.text,
+      alignSelf: 'flex-end',
+      marginTop: 4,
+    },
+    inputContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 8,
+      paddingBottom: 20,
+      marginTop: -20,
+      marginBottom: 30,
+    },
+    inputWrapper: {
+      flex: 1,
+      marginRight: 8,
+    },
+    sendButton: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: theme.colors.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+  });

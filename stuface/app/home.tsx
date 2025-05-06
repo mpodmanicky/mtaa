@@ -1,7 +1,7 @@
-import PillBox from "@/components/PillBox";
-import { useTheme } from "@/context/ThemeContex";
-import { Stack, useRouter } from "expo-router";
-import React from "react";
+import PillBox from '@/components/PillBox';
+import { useTheme } from '@/context/ThemeContex';
+import { Stack, useRouter } from 'expo-router';
+import React from 'react';
 import {
   ImageBackground,
   View,
@@ -10,8 +10,8 @@ import {
   SafeAreaView,
   Text,
   StatusBar,
-  Platform
-} from "react-native";
+  Platform,
+} from 'react-native';
 
 export default function Home() {
   const router = useRouter();
@@ -21,23 +21,23 @@ export default function Home() {
   const topics = [
     {
       id: 1,
-      name: "Dormitory",
+      name: 'Dormitory',
     },
     {
       id: 2,
-      name: "University",
+      name: 'University',
     },
     {
       id: 3,
-      name: "Canteen",
+      name: 'Canteen',
     },
     {
       id: 4,
-      name: "Library",
+      name: 'Library',
     },
     {
       id: 5,
-      name: "Other",
+      name: 'Other',
     },
   ];
 
@@ -54,42 +54,42 @@ export default function Home() {
       <Stack.Screen
         options={{
           headerShown: false,
-          headerTitle: "",
-          headerBackButtonDisplayMode: "minimal",
+          headerTitle: '',
+          headerBackButtonDisplayMode: 'minimal',
         }}
       />
       <ImageBackground
         source={theme.colors.background}
         resizeMode="cover"
-        style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+        style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
       >
         <SafeAreaView style={styles.safeArea}>
           <View style={styles.header}>
             <Text style={styles.headerText}>Home</Text>
           </View>
           <View style={styles.topics}>
-       {topics.map((topic) => (
-                <TouchableOpacity
-                  key={topic.id}
-                  onPress={() => handleTopicPress(topic.id)}
-                  style={styles.pillWrapper}
-                >
-                  <PillBox text={topic.name} />
-                </TouchableOpacity>
-              ))}
+            {topics.map((topic) => (
+              <TouchableOpacity
+                key={topic.id}
+                onPress={() => handleTopicPress(topic.id)}
+                style={styles.pillWrapper}
+              >
+                <PillBox text={topic.name} />
+              </TouchableOpacity>
+            ))}
           </View>
         </SafeAreaView>
       </ImageBackground>
     </>
-
   );
 }
 
-const dynamicStyles = (theme: any) => StyleSheet.create({
-  pillWrapper: {
-    margin: 10,
-  },
-  safeArea: {
+const dynamicStyles = (theme: any) =>
+  StyleSheet.create({
+    pillWrapper: {
+      margin: 10,
+    },
+    safeArea: {
       flex: 1,
       width: '100%',
       paddingTop: StatusBar.currentHeight || 10,
@@ -104,10 +104,10 @@ const dynamicStyles = (theme: any) => StyleSheet.create({
       paddingHorizontal: 20,
       marginBottom: 20,
       marginTop: 10,
-      alignSelf: 'flex-start',  // Keep header on the left
+      alignSelf: 'flex-start', // Keep header on the left
     },
     topics: {
       flex: 1,
-      marginTop: Platform === "iOS" ? 0: 70,
-    }
-});
+      marginTop: Platform === 'ios' ? 0 : 70,
+    },
+  });

@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from "react";
+// app/(tabs)/CreateScreen.tsx
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,20 +12,23 @@ import {
   Alert,
   Modal,
   Image,
-} from "react-native";
-import { useTheme } from "@/context/ThemeContex";
-import Inputs from "@/components/Inputs";
-import { Ionicons } from "@expo/vector-icons";
-import Buttons from "@/components/Buttons";
-import { Stack } from "expo-router";
-import * as Location from "expo-location";
-import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
+} from 'react-native';
+
+import Inputs from '@/components/Inputs';
+import { Ionicons } from '@expo/vector-icons';
+import Buttons from '@/components/Buttons';
+import { Stack } from 'expo-router';
+import * as Location from 'expo-location';
+import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
+import * as ImagePicker from 'expo-image-picker';
+
+import { useTheme } from '@/context/ThemeContex';
 
 export default function CreateScreen() {
   const { theme } = useTheme();
   const styles = dynamicStyles(theme);
-  const [selectedCategory, setSelectedCategory] = useState("general");
-  const [postText, setPostText] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState('general');
+  const [postText, setPostText] = useState('');
   const [location, setLocation] = useState<Location.LocationObject | null>(
     null
   );
@@ -32,7 +36,7 @@ export default function CreateScreen() {
   const [placeName, setPlaceName] = useState<string | null>(null);
 
   // Camera states
-  const [facing, setFacing] = useState<CameraType>("back");
+  const [facing, setFacing] = useState<CameraType>('back');
   const [permission, requestPermission] = useCameraPermissions();
   const [cameraVisible, setCameraVisible] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
@@ -43,8 +47,8 @@ export default function CreateScreen() {
   // Location function
   async function getCurrentLocation() {
     let { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== "granted") {
-      setErrorMsg("Permission to access location was denied");
+    if (status !== 'granted') {
+      setErrorMsg('Permission to access location was denied');
       return;
     }
 
@@ -67,7 +71,7 @@ export default function CreateScreen() {
       });
       if (geocodedLocation && geocodedLocation.length > 0) {
         const place = geocodedLocation[0];
-        return place.city + ", " + place.country;
+        return place.city + ', ' + place.country;
       }
     } catch (e) {
       console.error(e);
@@ -77,29 +81,51 @@ export default function CreateScreen() {
 
   // Handle camera icon press - request permission if needed
   const handleCameraPress = async () => {
-    // Check if we already have permission
     if (!permission?.granted) {
-      // If not, request it
       const permissionResult = await requestPermission();
-
       if (!permissionResult.granted) {
-        // Permission denied
         Alert.alert(
-          "Camera Permission Required",
-          "Please allow camera access to take pictures for your post.",
-          [{ text: "OK" }]
+          'Camera Permission Required',
+          'Please allow camera access to take pictures for your post.',
+          [{ text: 'OK' }]
         );
         return;
       }
     }
-
-    // Permission granted, show camera
     setCameraVisible(true);
+  };
+
+  // Handle gallery icon press - pick image from gallery
+  const handleGalleryPress = async () => {
+    // Запрашиваем разрешение на доступ к галерее
+    const permissionResult =
+      await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permissionResult.granted) {
+      Alert.alert(
+        'Gallery Permission Required',
+        'Please allow access to your gallery to select photos.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    // Открываем галерею для выбора фото
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 1,
+    });
+
+    if (!result.canceled) {
+      setCapturedImage(result.assets[0].uri);
+      console.log('Image selected from gallery:', result.assets[0].uri);
+    }
   };
 
   // Handle camera flip
   const toggleCameraFacing = () => {
-    setFacing((current) => (current === "back" ? "front" : "back"));
+    setFacing((current) => (current === 'back' ? 'front' : 'back'));
   };
 
   // Capture photo
@@ -108,28 +134,28 @@ export default function CreateScreen() {
       if (cameraRef.current) {
         const photo = await cameraRef.current.takePictureAsync();
         setCapturedImage(photo.uri);
-        console.log("Photo taken:", photo.uri);
+        console.log('Photo taken:', photo.uri);
         setCameraVisible(false);
       }
     } catch (error) {
-      console.error("Failed to take picture:", error);
-      Alert.alert("Error", "Failed to capture image. Please try again.");
+      console.error('Failed to take picture:', error);
+      Alert.alert('Error', 'Failed to capture image. Please try again.');
     }
   };
 
   const categories = [
-    { label: "General", value: "general" },
-    { label: "Dormitory", value: "dormitory" },
-    { label: "Canteen", value: "canteen" },
-    { label: "Library", value: "library" },
-    { label: "University", value: "university" },
+    { label: 'General', value: 'general' },
+    { label: 'Dormitory', value: 'dormitory' },
+    { label: 'Canteen', value: 'canteen' },
+    { label: 'Library', value: 'library' },
+    { label: 'University', value: 'university' },
   ];
 
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
       <ImageBackground
-        source={theme.colors.background}
+        source={require('../assets/images/LoginScreenBackground.png')} // Исправлено на изображение
         resizeMode="cover"
         style={styles.container}
       >
@@ -143,9 +169,9 @@ export default function CreateScreen() {
                 <Image
                   source={{ uri: capturedImage }}
                   style={styles.imagePreview}
-                  onLoad={() => console.log("Image loaded successfully")}
+                  onLoad={() => console.log('Image loaded successfully')}
                   onError={(e) =>
-                    console.error("Image load error:", e.nativeEvent.error)
+                    console.error('Image load error:', e.nativeEvent.error)
                   }
                 />
                 <TouchableOpacity
@@ -176,16 +202,19 @@ export default function CreateScreen() {
                   onPress={handleCameraPress}
                 >
                   <Ionicons
-                    name={capturedImage ? "camera" : "camera-outline"}
+                    name={capturedImage ? 'camera' : 'camera-outline'}
                     size={28}
-                    color={capturedImage ? "#4CAF50" : theme.colors.primary}
+                    color={capturedImage ? '#4CAF50' : theme.colors.primary}
                   />
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.iconButton}>
+                <TouchableOpacity
+                  style={styles.iconButton}
+                  onPress={handleGalleryPress} // Добавляем обработчик для галереи
+                >
                   <Ionicons
-                    name="image"
+                    name={capturedImage ? 'image' : 'image-outline'} // Обновляем иконку при выборе
                     size={28}
-                    color={theme.colors.primary}
+                    color={capturedImage ? '#4CAF50' : theme.colors.primary}
                   />
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -193,9 +222,9 @@ export default function CreateScreen() {
                   onPress={getCurrentLocation}
                 >
                   <Ionicons
-                    name={placeName ? "location" : "location-outline"}
+                    name={placeName ? 'location' : 'location-outline'}
                     size={28}
-                    color={placeName ? "#4CAF50" : theme.colors.primary}
+                    color={placeName ? '#4CAF50' : theme.colors.primary}
                   />
                 </TouchableOpacity>
               </View>
@@ -205,10 +234,10 @@ export default function CreateScreen() {
                 <Buttons
                   title="Post"
                   onPress={() => {
-                    console.log("Post content:", postText);
-                    console.log("Location:", placeName);
-                    console.log("Category:", selectedCategory);
-                    console.log("Image:", capturedImage);
+                    console.log('Post content:', postText);
+                    console.log('Location:', placeName);
+                    console.log('Category:', selectedCategory);
+                    console.log('Image:', capturedImage);
                     // Implement post submission here
                   }}
                 />
@@ -276,15 +305,15 @@ const dynamicStyles = (theme: any) =>
     },
     scrollContent: {
       padding: 20,
-      alignItems: "center",
+      alignItems: 'center',
     },
     headerText: {
       marginTop: 40,
       fontSize: 32,
-      fontWeight: "bold",
+      fontWeight: 'bold',
       marginBottom: 20,
       color: theme.colors.text,
-      alignSelf: "flex-start",
+      alignSelf: 'flex-start',
     },
     inputContainer: {
       width: 300,
@@ -292,24 +321,24 @@ const dynamicStyles = (theme: any) =>
     },
     textInput: {
       height: 170,
-      textAlignVertical: "top",
+      textAlignVertical: 'top',
     },
     actionsRow: {
-      flexDirection: "row",
-      justifyContent: "space-between",
+      flexDirection: 'row',
+      justifyContent: 'space-between',
       width: 300,
       marginBottom: 20,
     },
     iconsContainer: {
-      flexDirection: "row",
-      alignItems: "center",
+      flexDirection: 'row',
+      alignItems: 'center',
     },
     iconButton: {
       marginRight: 15,
       padding: 5,
     },
     buttonContainer: {
-      alignSelf: "flex-end",
+      alignSelf: 'flex-end',
     },
     pickerContainer: {
       width: 300,
@@ -319,35 +348,35 @@ const dynamicStyles = (theme: any) =>
       fontSize: 16,
       marginBottom: 8,
       color: theme.colors.text,
-      alignSelf: "flex-start",
+      alignSelf: 'flex-start',
     },
     pickerWrapper: {
       borderWidth: 1,
-      borderColor: theme.colors.border || "#ccc",
+      borderColor: theme.colors.border || '#ccc',
       borderRadius: 8,
-      overflow: "hidden",
-      backgroundColor: theme.colors.card || "#f9f9f9",
+      overflow: 'hidden',
+      backgroundColor: theme.colors.card || '#f9f9f9',
       padding: 10,
     },
     // Camera styles
     cameraContainer: {
       flex: 1,
-      backgroundColor: "black",
+      backgroundColor: 'black',
     },
     camera: {
       flex: 1,
     },
     cameraControlsContainer: {
-      position: "absolute",
+      position: 'absolute',
       bottom: 0,
       left: 0,
       right: 0,
-      flexDirection: "row",
-      justifyContent: "space-around",
-      alignItems: "center",
+      flexDirection: 'row',
+      justifyContent: 'space-around',
+      alignItems: 'center',
       paddingBottom: 30,
       paddingHorizontal: 20,
-      backgroundColor: "rgba(0,0,0,0.4)",
+      backgroundColor: 'rgba(0,0,0,0.4)',
     },
     cameraButton: {
       padding: 15,
@@ -357,33 +386,33 @@ const dynamicStyles = (theme: any) =>
       height: 70,
       borderRadius: 35,
       borderWidth: 4,
-      borderColor: "white",
-      justifyContent: "center",
-      alignItems: "center",
+      borderColor: 'white',
+      justifyContent: 'center',
+      alignItems: 'center',
     },
     captureButton: {
       width: 58,
       height: 58,
       borderRadius: 29,
-      backgroundColor: "white",
+      backgroundColor: 'white',
     },
     imagePreviewContainer: {
       width: 300,
       height: 200,
       marginBottom: 20,
       borderRadius: 8,
-      overflow: "hidden",
-      position: "relative",
+      overflow: 'hidden',
+      position: 'relative',
     },
     imagePreview: {
-      width: "100%",
-      height: "100%",
+      width: '100%',
+      height: '100%',
     },
     removeImageButton: {
-      position: "absolute",
+      position: 'absolute',
       top: 10,
       right: 10,
-      backgroundColor: "rgba(0,0,0,0.5)",
+      backgroundColor: 'rgba(0,0,0,0.5)',
       borderRadius: 15,
       padding: 5,
     },
