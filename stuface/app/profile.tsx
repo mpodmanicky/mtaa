@@ -9,6 +9,7 @@ import {
   Image,
   StyleSheet,
   TouchableOpacity,
+  Alert,
 } from "react-native";
 import { useTheme } from "@/context/ThemeContex";
 import { Stack, useRouter } from "expo-router";
@@ -40,7 +41,58 @@ export default function ProfileScreen() {
     };
 
     loadUsername();
-  }, [])
+  }, []);
+
+  // Logout function
+  const handleLogout = async () => {
+    Alert.alert(
+      "Logout",
+      "Are you sure you want to logout?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        {
+          text: "Logout",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              // Clear user data from AsyncStorage
+              await AsyncStorage.removeItem("loginData");
+              await AsyncStorage.removeItem("username");
+              await AsyncStorage.removeItem("userId");
+
+              // You can add more items to clear if needed
+
+              console.log("Logged out successfully");
+
+              // Show success message
+              Alert.alert(
+                "Logged Out",
+                "You have been successfully logged out",
+                [
+                  {
+                    text: "OK",
+                    onPress: () => {
+                      // Navigate to login screen after showing the message
+                      router.replace("/");
+                    }
+                  }
+                ]
+              );
+            } catch (error) {
+              console.error("Error during logout:", error);
+              Alert.alert(
+                "Error",
+                "Failed to log out. Please try again."
+              );
+            }
+          }
+        }
+      ]
+    );
+  };
 
   return (
     <>
@@ -81,7 +133,7 @@ export default function ProfileScreen() {
 
           {/* Logout Button */}
           <View style={styles.logoutContainer}>
-            <Buttons title="Log Out" onPress={() => { /* logout logic */ }} />
+            <Buttons title="Log Out" onPress={handleLogout} />
           </View>
         </SafeAreaView>
       </ImageBackground>

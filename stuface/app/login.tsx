@@ -14,6 +14,7 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
   TouchableOpacity,
+  Alert,
 } from "react-native";
 import Inputs from "@/components/Inputs";
 import { useTheme } from "@/context/ThemeContex";
@@ -42,7 +43,7 @@ export default function Login() {
   }
 
   async function login() {
-    // first set username and password
+    // first set username and password // this can later be removed now just for development
     if(password !== "" && username !== "") {
       // testing
       saveLoginData({ username: username, password: password });
@@ -60,15 +61,7 @@ export default function Login() {
       if(response.status === 200) {
         return response.json()
       } else {
-        // wihtout backend login
-        if(username === "test" && password === "test") {
-
-        saveLoginData({ username: username, password: password });
-        updateUsername(username);
-        router.push({
-          pathname: "/home",
-        });
-      }
+        Alert.alert("Error", "Invalid username or password", [{text: "OK"}])
       }
     })
     .then((data) => {
@@ -81,15 +74,7 @@ export default function Login() {
     })
     .catch((e) => {
       console.log(e);
-      // wihtout backend login
-      if(username === "test" && password === "test") {
-        saveLoginData({ username: username, password: password });
-        updateUsername(username);
-        router.push({
-          pathname: "/home",
-        });
-        return;
-      }
+      Alert.alert("Error", "Connection error", [{text: "OK"}])
     })
   }
 
