@@ -19,34 +19,18 @@ export default function Home() {
   const styles = dynamicStyles(theme);
 
   const topics = [
-    {
-      id: 1,
-      name: 'Dormitory',
-    },
-    {
-      id: 2,
-      name: 'University',
-    },
-    {
-      id: 3,
-      name: 'Canteen',
-    },
-    {
-      id: 4,
-      name: 'Library',
-    },
-    {
-      id: 5,
-      name: 'Other',
-    },
+    { id: 'dormitory', name: 'Dormitory' },
+    { id: 'university', name: 'University' },
+    { id: 'canteen', name: 'Canteen' },
+    { id: 'library', name: 'Library' },
+    { id: 'other', name: 'Other' },
   ];
 
-  const handleTopicPress = (topicId: number) => {
-    // navigate to the topic
-    // router.push({
-    //   pathname: "/topic/[id]",
-    //   params: { id: topicId },
-    // })
+  const handleTopicPress = (topicId: string) => {
+    router.push({
+      pathname: '/topics/[id]',
+      params: { id: topicId },
+    });
   };
 
   return (
@@ -104,10 +88,10 @@ const dynamicStyles = (theme: any) =>
       paddingHorizontal: 20,
       marginBottom: 20,
       marginTop: 10,
-      alignSelf: 'flex-start', // Keep header on the left
+      alignSelf: 'flex-start',
     },
     topics: {
       flex: 1,
-      marginTop: Platform === 'ios' ? 0 : 70,
+      marginTop: Platform.OS === 'ios' ? 0 : 70,
     },
   });
