@@ -8,6 +8,8 @@ import {
   ScrollView,
   StatusBar,
   TouchableOpacity,
+  Image,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { useTheme } from '@/context/ThemeContex';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -67,7 +69,13 @@ export default function TopicScreen() {
       },
     ]);
   }, [id]);
-
+  const handleLikePress = (postId: string) => {
+    setPosts((prevPosts) =>
+      prevPosts.map((post) =>
+        post.id === postId ? { ...post, likes: post.likes + 1 } : post
+      )
+    );
+  };
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
@@ -102,11 +110,29 @@ export default function TopicScreen() {
                 </View>
                 <View style={styles.bodyContainer}>
                   <Text style={styles.body}>{post.body}</Text>
-                </View>
-                <View style={styles.stats}>
-                  <Text style={styles.statText}>{post.timestamp}</Text>
-                  <Text style={styles.statText}>{post.likes} ❤️</Text>
-                  <Text style={styles.statText}>{post.comments} 💬</Text>
+                  <View style={styles.stats}>
+                    <Text style={[styles.statText, styles.timestampText]}>
+                      {post.timestamp}
+                    </Text>
+                    <TouchableWithoutFeedback
+                      onPress={() => handleLikePress(post.id)}
+                    >
+                      <View style={styles.statItem}>
+                        <Image
+                          source={require('@/assets/images/like_topik.png')}
+                          style={styles.statIcon}
+                        />
+                        <Text style={styles.statText}>{post.likes}</Text>
+                      </View>
+                    </TouchableWithoutFeedback>
+                    <View style={styles.statItem}>
+                      <Image
+                        source={require('@/assets/images/comment.png')}
+                        style={styles.statIcon}
+                      />
+                      <Text style={styles.statText}>{post.comments}</Text>
+                    </View>
+                  </View>
                 </View>
               </View>
             ))}
@@ -169,16 +195,29 @@ const dynamicStyles = (theme: any) =>
     },
     body: {
       fontSize: 14,
-      color: '#000000', // Changed to black for better contrast
+      color: '#000000',
     },
     stats: {
       flexDirection: 'row',
       justifyContent: 'flex-end',
-      marginTop: 5,
+      marginTop: 'auto',
+      paddingTop: 10,
+    },
+    statItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginLeft: 10,
+    },
+    statIcon: {
+      width: 12,
+      height: 12,
+      marginRight: 4,
     },
     statText: {
       fontSize: 12,
-      color: theme.colors.text,
-      marginLeft: 10,
+      color: '#000000',
+    },
+    timestampText: {
+      color: '#000000',
     },
   });
