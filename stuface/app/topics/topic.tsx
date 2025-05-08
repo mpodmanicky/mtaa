@@ -34,7 +34,9 @@ export default function TopicScreen() {
   const router = useRouter();
   const [posts, setPosts] = useState<Post[]>([]);
   const [currentUsername, setCurrentUsername] = useState<string | null>(null);
-  const [likedPosts, setLikedPosts] = useState<{ [key: string]: boolean }>({});
+  const [likedPosts, setLikedPosts] = useState<{ [postId: string]: boolean }>(
+    {}
+  );
 
   // Load current user's username
   useEffect(() => {
@@ -50,42 +52,129 @@ export default function TopicScreen() {
     loadUsername();
   }, []);
 
+  // Load posts based on topic id
   useEffect(() => {
-    setPosts([
-      {
-        id: '1',
-        username: 'turcio',
-        body: 'Post body',
-        likes: 10,
-        comments: 10,
-        timestamp: '10:20',
-      },
-      {
-        id: '2',
-        username: 'ZK0T017',
-        body: 'Post body',
-        likes: 10,
-        comments: 10,
-        timestamp: '13:10',
-      },
-      {
-        id: '3',
-        username: 'Eesordi',
-        body: 'Post body',
-        likes: 10,
-        comments: 2,
-        timestamp: '7:10',
-      },
-      {
-        id: '4',
-        username: 'otetef',
-        body: 'Post body',
-        likes: 3,
-        comments: 18,
-        timestamp: '23:10',
-      },
-    ]);
+    if (id === 'dormitory') {
+      setPosts([
+        {
+          id: '1',
+          username: 'turcio',
+          body: 'Post body',
+          likes: 10,
+          comments: 10,
+          timestamp: '10:20',
+        },
+        {
+          id: '2',
+          username: 'ZK0T017',
+          body: 'Post body',
+          likes: 10,
+          comments: 10,
+          timestamp: '13:10',
+        },
+        {
+          id: '3',
+          username: 'Eesordi',
+          body: 'Post body',
+          likes: 10,
+          comments: 2,
+          timestamp: '7:10',
+        },
+        {
+          id: '4',
+          username: 'otetef',
+          body: 'Post body',
+          likes: 3,
+          comments: 18,
+          timestamp: '23:10',
+        },
+      ]);
+    } else if (id === 'university') {
+      setPosts([
+        {
+          id: '1',
+          username: 'AlexU',
+          body: 'Lecture notes',
+          likes: 15,
+          comments: 5,
+          timestamp: '09:30',
+        },
+        {
+          id: '2',
+          username: 'StudyPro',
+          body: 'Group study tomorrow',
+          likes: 8,
+          comments: 3,
+          timestamp: '14:00',
+        },
+        {
+          id: '3',
+          username: 'UniFan',
+          body: 'Post body',
+          likes: 12,
+          comments: 7,
+          timestamp: '16:20',
+        },
+      ]);
+    } else if (id === 'canteen') {
+      setPosts([
+        {
+          id: '1',
+          username: 'Foodie',
+          body: 'Best meal today!',
+          likes: 20,
+          comments: 12,
+          timestamp: '12:00',
+        },
+        {
+          id: '2',
+          username: 'HungryStu',
+          body: 'Post body',
+          likes: 5,
+          comments: 2,
+          timestamp: '13:45',
+        },
+        {
+          id: '3',
+          username: 'ChefX',
+          body: 'New menu alert',
+          likes: 18,
+          comments: 9,
+          timestamp: '18:10',
+        },
+      ]);
+    } else if (id === 'library') {
+      setPosts([
+        {
+          id: '1',
+          username: 'BookLover',
+          body: 'Quiet study spot',
+          likes: 7,
+          comments: 4,
+          timestamp: '10:50',
+        },
+        {
+          id: '2',
+          username: 'ReadAll',
+          body: 'Post body',
+          likes: 9,
+          comments: 6,
+          timestamp: '15:30',
+        },
+        {
+          id: '3',
+          username: 'LibUser',
+          body: 'Book reservation',
+          likes: 11,
+          comments: 3,
+          timestamp: '20:00',
+        },
+      ]);
+    } else {
+      setPosts([]); // Default to empty if topic is unknown
+    }
   }, [id]);
+
   const handleLikePress = (postId: string) => {
     if (!currentUsername) return; // Don't allow liking if username isn't loaded
 
@@ -113,12 +202,30 @@ export default function TopicScreen() {
       return updatedLikes;
     });
   };
+
   const handleCommentPress = (postId: string, username: string) => {
     router.push({
       pathname: '/topics/comments',
       params: { postId, username },
     });
   };
+
+  // Map topic id to display name
+  const getTopicDisplayName = (topicId: string | string[] | undefined) => {
+    switch (topicId) {
+      case 'dormitory':
+        return 'Dormitory Topic';
+      case 'university':
+        return 'University Topic';
+      case 'canteen':
+        return 'Canteen Topic';
+      case 'library':
+        return 'Library Topic';
+      default:
+        return 'Topic';
+    }
+  };
+
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
@@ -135,9 +242,7 @@ export default function TopicScreen() {
             >
               <Ionicons name="arrow-back" size={24} color="white" />
             </TouchableOpacity>
-            <Text style={styles.headerText}>
-              {id === 'library' ? 'Library Topic' : 'Topic'}
-            </Text>
+            <Text style={styles.headerText}>{getTopicDisplayName(id)}</Text>
           </View>
           <ScrollView contentContainerStyle={styles.scrollContent}>
             {posts.map((post) => (

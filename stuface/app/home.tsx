@@ -28,7 +28,7 @@ export default function Home() {
 
   const handleTopicPress = (topicId: string) => {
     router.push({
-      pathname: '/topics/[id]',
+      pathname: '/topics/topic',
       params: { id: topicId },
     });
   };
