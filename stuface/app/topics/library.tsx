@@ -15,6 +15,7 @@ import { useTheme } from '@/context/ThemeContex';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import PillBox from '@/components/PillBox';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Define post type
 interface Post {
@@ -32,6 +33,22 @@ export default function TopicScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const [posts, setPosts] = useState<Post[]>([]);
+  const [currentUsername, setCurrentUsername] = useState<string | null>(null);
+  const [likedPosts, setLikedPosts] = useState<{ [key: string]: boolean }>({});
+
+  // Load current user's username
+  useEffect(() => {
+    const loadUsername = async () => {
+      try {
+        const storedUsername = await AsyncStorage.getItem('username');
+        setCurrentUsername(storedUsername);
+      } catch (error) {
+        console.error('Error loading username:', error);
+      }
+    };
+
+    loadUsername();
+  }, []);
 
   useEffect(() => {
     setPosts([
@@ -70,11 +87,37 @@ export default function TopicScreen() {
     ]);
   }, [id]);
   const handleLikePress = (postId: string) => {
-    setPosts((prevPosts) =>
-      prevPosts.map((post) =>
-        post.id === postId ? { ...post, likes: post.likes + 1 } : post
-      )
-    );
+    if (!currentUsername) return; // Don't allow liking if username isn't loaded
+
+    setLikedPosts((prev) => {
+      const hasLiked = !!prev[postId];
+      const updatedLikes = { ...prev };
+
+      if (hasLiked) {
+        // Unlike: Remove the like
+        delete updatedLikes[postId];
+      } else {
+        // Like: Add the like
+        updatedLikes[postId] = true;
+      }
+
+      // Update the posts state with the new like count
+      setPosts((prevPosts) =>
+        prevPosts.map((post) =>
+          post.id === postId
+            ? { ...post, likes: hasLiked ? post.likes - 1 : post.likes + 1 }
+            : post
+        )
+      );
+
+      return updatedLikes;
+    });
+  };
+  const handleCommentPress = (postId: string, username: string) => {
+    router.push({
+      pathname: '/topics/comments',
+      params: { postId, username },
+    });
   };
   return (
     <>
@@ -125,13 +168,17 @@ export default function TopicScreen() {
                         <Text style={styles.statText}>{post.likes}</Text>
                       </View>
                     </TouchableWithoutFeedback>
-                    <View style={styles.statItem}>
-                      <Image
-                        source={require('@/assets/images/comment.png')}
-                        style={styles.statIcon}
-                      />
-                      <Text style={styles.statText}>{post.comments}</Text>
-                    </View>
+                    <TouchableWithoutFeedback
+                      onPress={() => handleCommentPress(post.id, post.username)}
+                    >
+                      <View style={styles.statItem}>
+                        <Image
+                          source={require('@/assets/images/comment.png')}
+                          style={styles.statIcon}
+                        />
+                        <Text style={styles.statText}>{post.comments}</Text>
+                      </View>
+                    </TouchableWithoutFeedback>
                   </View>
                 </View>
               </View>
@@ -209,8 +256,8 @@ const dynamicStyles = (theme: any) =>
       marginLeft: 10,
     },
     statIcon: {
-      width: 12,
-      height: 12,
+      width: 14,
+      height: 14,
       marginRight: 4,
     },
     statText: {
