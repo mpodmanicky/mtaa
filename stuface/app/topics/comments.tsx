@@ -29,6 +29,16 @@ interface Post {
   timestamp: string;
 }
 
+// Define comment type
+interface Comment {
+  id: string;
+  username: string;
+  text: string;
+  likes: number;
+  comments: number;
+  timestamp: string;
+}
+
 export default function CommentsScreen() {
   const { theme } = useTheme();
   const styles = dynamicStyles(theme);
@@ -40,6 +50,12 @@ export default function CommentsScreen() {
   const [likedPosts, setLikedPosts] = useState<{ [postId: string]: boolean }>(
     {}
   );
+  const [likedComments, setLikedComments] = useState<{
+    [commentId: string]: boolean;
+  }>({});
+  const [commentsByPost, setCommentsByPost] = useState<{
+    [postId: string]: Comment[];
+  }>({});
 
   // Load current user's username
   useEffect(() => {
@@ -124,9 +140,65 @@ export default function CommentsScreen() {
     });
   };
 
+  const handleCommentLikePress = (commentId: string) => {
+    if (!currentUsername) return; // Don't allow liking if username isn't loaded
+
+    setLikedComments((prev) => {
+      const hasLiked = !!prev[commentId];
+      const updatedLikes = { ...prev };
+
+      if (hasLiked) {
+        // Unlike: Remove the like
+        delete updatedLikes[commentId];
+      } else {
+        // Like: Add the like
+        updatedLikes[commentId] = true;
+      }
+
+      // Update the comments state with the new like count
+      setCommentsByPost((prevComments) => {
+        const updatedComments = { ...prevComments };
+        const postComments = updatedComments[postId || ''] || [];
+        updatedComments[postId || ''] = postComments.map((comment) =>
+          comment.id === commentId
+            ? {
+                ...comment,
+                likes: hasLiked ? comment.likes - 1 : comment.likes + 1,
+              }
+            : comment
+        );
+        return updatedComments;
+      });
+
+      return updatedLikes;
+    });
+  };
+
   const handleCommentSubmit = () => {
-    if (commentText.trim()) {
-      console.log(`Comment submitted for post ${postId}: ${commentText}`);
+    if (commentText.trim() && currentUsername && post && postId) {
+      const newComment: Comment = {
+        id: Date.now().toString(), // Simple unique ID based on timestamp
+        username: currentUsername,
+        text: commentText,
+        likes: 0,
+        comments: 0,
+        timestamp: new Date().toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+      };
+
+      setCommentsByPost((prevComments) => {
+        const updatedComments = { ...prevComments };
+        updatedComments[postId] = [
+          ...(updatedComments[postId] || []),
+          newComment,
+        ];
+        return updatedComments;
+      });
+      setPost((prevPost) =>
+        prevPost ? { ...prevPost, comments: prevPost.comments + 1 } : null
+      );
       setCommentText(''); // Clear input after submission
     }
   };
@@ -160,42 +232,91 @@ export default function CommentsScreen() {
           >
             <ScrollView contentContainerStyle={styles.scrollContent}>
               {post && (
-                <View style={styles.postCard}>
-                  <View style={styles.usernameContainer}>
-                    <Ionicons
-                      name="send"
-                      size={16}
-                      color={theme.colors.text}
-                      style={styles.airplaneIcon}
-                    />
-                    <Text style={styles.username}>{post.username}</Text>
-                  </View>
-                  <View style={styles.bodyContainer}>
-                    <Text style={styles.body}>{post.body}</Text>
-                    <View style={styles.stats}>
-                      <Text style={[styles.statText, styles.timestampText]}>
-                        {post.timestamp}
-                      </Text>
-                      <TouchableWithoutFeedback
-                        onPress={() => handleLikePress(post.id)}
-                      >
+                <View>
+                  <View style={styles.postCard}>
+                    <View style={styles.usernameContainer}>
+                      <Ionicons
+                        name="send"
+                        size={16}
+                        color={theme.colors.text}
+                        style={styles.airplaneIcon}
+                      />
+                      <Text style={styles.username}>{post.username}</Text>
+                    </View>
+                    <View style={styles.bodyContainer}>
+                      <Text style={styles.body}>{post.body}</Text>
+                      <View style={styles.stats}>
+                        <Text style={[styles.statText, styles.timestampText]}>
+                          {post.timestamp}
+                        </Text>
+                        <TouchableWithoutFeedback
+                          onPress={() => handleLikePress(post.id)}
+                        >
+                          <View style={styles.statItem}>
+                            <Image
+                              source={require('@/assets/images/like_topik.png')}
+                              style={styles.statIcon}
+                            />
+                            <Text style={styles.statText}>{post.likes}</Text>
+                          </View>
+                        </TouchableWithoutFeedback>
                         <View style={styles.statItem}>
                           <Image
-                            source={require('@/assets/images/like_topik.png')}
+                            source={require('@/assets/images/comment.png')}
                             style={styles.statIcon}
                           />
-                          <Text style={styles.statText}>{post.likes}</Text>
+                          <Text style={styles.statText}>{post.comments}</Text>
                         </View>
-                      </TouchableWithoutFeedback>
-                      <View style={styles.statItem}>
-                        <Image
-                          source={require('@/assets/images/comment.png')}
-                          style={styles.statIcon}
-                        />
-                        <Text style={styles.statText}>{post.comments}</Text>
                       </View>
                     </View>
                   </View>
+                  {(
+                    commentsByPost[
+                      Array.isArray(postId) ? postId[0] : postId || ''
+                    ] || []
+                  ).map((comment) => (
+                    <View key={comment.id} style={styles.commentCard}>
+                      <View style={styles.usernameContainer}>
+                        <Ionicons
+                          name="send"
+                          size={16}
+                          color={theme.colors.text}
+                          style={styles.airplaneIcon}
+                        />
+                        <Text style={styles.username}>{comment.username}</Text>
+                      </View>
+                      <View style={styles.bodyContainer}>
+                        <Text style={styles.body}>{comment.text}</Text>
+                        <View style={styles.stats}>
+                          <Text style={[styles.statText, styles.timestampText]}>
+                            {comment.timestamp}
+                          </Text>
+                          <TouchableWithoutFeedback
+                            onPress={() => handleCommentLikePress(comment.id)}
+                          >
+                            <View style={styles.statItem}>
+                              <Image
+                                source={require('@/assets/images/like_topik.png')}
+                                style={styles.statIcon}
+                              />
+                              <Text style={styles.statText}>
+                                {comment.likes}
+                              </Text>
+                            </View>
+                          </TouchableWithoutFeedback>
+                          <View style={styles.statItem}>
+                            <Image
+                              source={require('@/assets/images/comment.png')}
+                              style={styles.statIcon}
+                            />
+                            <Text style={styles.statText}>
+                              {comment.comments}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+                    </View>
+                  ))}
                 </View>
               )}
             </ScrollView>
@@ -268,6 +389,9 @@ const dynamicStyles = (theme: any) =>
     postCard: {
       marginBottom: 15,
     },
+    commentCard: {
+      marginBottom: 15,
+    },
     usernameContainer: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -285,7 +409,7 @@ const dynamicStyles = (theme: any) =>
       backgroundColor: '#E0F7FA',
       borderRadius: 10,
       padding: 20,
-      minHeight: 100,
+      minHeight: 50,
     },
     body: {
       fontSize: 14,
@@ -309,7 +433,6 @@ const dynamicStyles = (theme: any) =>
     },
     statText: {
       fontSize: 12,
-
       color: '#000000',
     },
     timestampText: {
