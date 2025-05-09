@@ -1,7 +1,7 @@
-import PillBox from "@/components/PillBox";
-import { useTheme } from "@/context/ThemeContex";
-import { Stack, useRouter } from "expo-router";
-import React from "react";
+import PillBox from '@/components/PillBox';
+import { useTheme } from '@/context/ThemeContex';
+import { Stack, useRouter } from 'expo-router';
+import React from 'react';
 import {
   ImageBackground,
   View,
@@ -10,8 +10,8 @@ import {
   SafeAreaView,
   Text,
   StatusBar,
-  Platform
-} from "react-native";
+  Platform,
+} from 'react-native';
 
 export default function Home() {
   const router = useRouter();
@@ -19,34 +19,18 @@ export default function Home() {
   const styles = dynamicStyles(theme);
 
   const topics = [
-    {
-      id: 1,
-      name: "Dormitory",
-    },
-    {
-      id: 2,
-      name: "University",
-    },
-    {
-      id: 3,
-      name: "Canteen",
-    },
-    {
-      id: 4,
-      name: "Library",
-    },
-    {
-      id: 5,
-      name: "Other",
-    },
+    { id: 'dormitory', name: 'Dormitory' },
+    { id: 'university', name: 'University' },
+    { id: 'canteen', name: 'Canteen' },
+    { id: 'library', name: 'Library' },
+    { id: 'other', name: 'Other' },
   ];
 
-  const handleTopicPress = (topicId: number) => {
-    // navigate to the topic
-    // router.push({
-    //   pathname: "/topic/[id]",
-    //   params: { id: topicId },
-    // })
+  const handleTopicPress = (topicId: string) => {
+    router.push({
+      pathname: '/topics/topic',
+      params: { id: topicId },
+    });
   };
 
   return (
@@ -54,42 +38,42 @@ export default function Home() {
       <Stack.Screen
         options={{
           headerShown: false,
-          headerTitle: "",
-          headerBackButtonDisplayMode: "minimal",
+          headerTitle: '',
+          headerBackButtonDisplayMode: 'minimal',
         }}
       />
       <ImageBackground
         source={theme.colors.background}
         resizeMode="cover"
-        style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+        style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
       >
         <SafeAreaView style={styles.safeArea}>
           <View style={styles.header}>
             <Text style={styles.headerText}>Home</Text>
           </View>
           <View style={styles.topics}>
-       {topics.map((topic) => (
-                <TouchableOpacity
-                  key={topic.id}
-                  onPress={() => handleTopicPress(topic.id)}
-                  style={styles.pillWrapper}
-                >
-                  <PillBox text={topic.name} />
-                </TouchableOpacity>
-              ))}
+            {topics.map((topic) => (
+              <TouchableOpacity
+                key={topic.id}
+                onPress={() => handleTopicPress(topic.id)}
+                style={styles.pillWrapper}
+              >
+                <PillBox text={topic.name} />
+              </TouchableOpacity>
+            ))}
           </View>
         </SafeAreaView>
       </ImageBackground>
     </>
-
   );
 }
 
-const dynamicStyles = (theme: any) => StyleSheet.create({
-  pillWrapper: {
-    margin: 10,
-  },
-  safeArea: {
+const dynamicStyles = (theme: any) =>
+  StyleSheet.create({
+    pillWrapper: {
+      margin: 10,
+    },
+    safeArea: {
       flex: 1,
       width: '100%',
       paddingTop: StatusBar.currentHeight || 10,
@@ -104,10 +88,10 @@ const dynamicStyles = (theme: any) => StyleSheet.create({
       paddingHorizontal: 20,
       marginBottom: 20,
       marginTop: 10,
-      alignSelf: 'flex-start',  // Keep header on the left
+      alignSelf: 'flex-start',
     },
     topics: {
       flex: 1,
-      marginTop: Platform === "iOS" ? 0: 70,
-    }
-});
+      marginTop: Platform.OS === 'ios' ? 0 : 70,
+    },
+  });
