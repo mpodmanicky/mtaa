@@ -113,6 +113,7 @@ export default function Register() {
                 fontWeight: "bold",
                 marginTop: 120,
                 marginBottom: 120,
+                color: theme.colors.text,
               }}
             >
               STUFace

@@ -12,6 +12,7 @@ import {
   Alert,
   Modal,
   Image,
+  StatusBar,
 } from 'react-native';
 
 import Inputs from '@/components/Inputs';
@@ -155,7 +156,7 @@ export default function CreateScreen() {
     <>
       <Stack.Screen options={{ headerShown: false }} />
       <ImageBackground
-        source={require('../assets/images/LoginScreenBackground.png')} // Исправлено на изображение
+        source={theme.colors.background} // Исправлено на изображение
         resizeMode="cover"
         style={styles.container}
       >
@@ -302,13 +303,13 @@ const dynamicStyles = (theme: any) =>
     },
     safeArea: {
       flex: 1,
+      paddingTop: StatusBar.currentHeight || 10
     },
     scrollContent: {
       padding: 20,
       alignItems: 'center',
     },
     headerText: {
-      marginTop: 40,
       fontSize: 32,
       fontWeight: 'bold',
       marginBottom: 20,
