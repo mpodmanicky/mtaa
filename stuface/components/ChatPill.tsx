@@ -76,7 +76,7 @@ const getStyles = (theme: any, unread: boolean) =>
     message: {
       fontSize: 14,
       fontWeight: unread ? "bold" : "normal",
-      color: theme.colors.primary || "#666",
+      color: theme.colors.secondary || "#666",
     },
     time: {
       fontSize: 12,
