@@ -1,11 +1,20 @@
 const express = require("express");
-const app = express();
 const { Pool } = require("pg");
 const multer = require("multer");
 const path = require("path");
-let pool = null;
 const fs = require("fs");
-pool = new Pool({
+const http = require("http");
+const WebSocket = require("ws");
+const url = require("url");
+const cors = require("cors");
+
+// Initialize Express app
+const app = express();
+app.use(express.json());
+app.use(cors());
+
+// Create a database connection
+const pool = new Pool({
   host: "localhost",
   port: "5434",
   user: "postgres",
@@ -13,9 +22,6 @@ pool = new Pool({
   database: "mtaa",
 });
 
-app.listen(8080, () => {
-  console.log("REST API IS UP AND RUNNING ON LOCALHOST:8080");
-});
 // Configure multer to save files
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -40,11 +46,358 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-const upload = multer({
-  storage: storage,
-  fileFilter: fileFilter,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+// Create multer upload middleware
+const upload = multer({ storage, fileFilter });
+
+// Create HTTP server by wrapping the Express app
+const server = http.createServer(app);
+
+// ===========================================
+// CHAT DATABASE SETUP
+// ===========================================
+
+// Create tables needed for chat functionality
+async function createChatTables() {
+  try {
+    // Create conversations table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS conversations (
+        id SERIAL PRIMARY KEY,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Create conversation participants table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS conversation_participants (
+        conversation_id INTEGER REFERENCES conversations(id) ON DELETE CASCADE,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        PRIMARY KEY (conversation_id, user_id)
+      );
+    `);
+
+    // Create messages table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS messages (
+        id SERIAL PRIMARY KEY,
+        conversation_id INTEGER REFERENCES conversations(id) ON DELETE CASCADE,
+        sender_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        content TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    console.log('Chat tables created successfully');
+  } catch (error) {
+    console.error('Error creating chat tables:', error);
+  }
+}
+
+// Initialize chat tables after a short delay to ensure the users table exists
+setTimeout(() => {
+  createChatTables();
+}, 3000);
+
+// ===========================================
+// WEBSOCKET SERVER SETUP
+// ===========================================
+
+// Create WebSocket server instance
+const wss = new WebSocket.Server({ noServer: true });
+
+// Store active connections
+const clients = new Map();
+
+// Handle WebSocket connection
+wss.on('connection', async (ws, request, userId) => {
+  // Store the connection with the user ID
+  clients.set(userId, ws);
+
+  console.log(`Client connected: User ${userId}`);
+
+  // Send welcome message
+  ws.send(JSON.stringify({
+    type: 'connection',
+    message: 'Connected to WebSocket server',
+    timestamp: Date.now()
+  }));
+
+  // Handle incoming messages
+  ws.on('message', async (message) => {
+    try {
+      const parsedMessage = JSON.parse(message);
+
+      // Validate message structure
+      if (!parsedMessage.type || !parsedMessage.text || !parsedMessage.sender) {
+        ws.send(JSON.stringify({
+          type: 'error',
+          message: 'Invalid message format',
+          timestamp: Date.now()
+        }));
+        return;
+      }
+
+      if (parsedMessage.type === 'message') {
+        // Extract message data
+        const { text, sender, conversationId } = parsedMessage;
+        const timestamp = parsedMessage.timestamp || Date.now();
+
+        // Ensure we have a valid conversation
+        let actualConversationId = conversationId;
+
+        if (!actualConversationId) {
+          // Create a new conversation if one wasn't provided
+          const newConversation = await pool.query(
+            'INSERT INTO conversations DEFAULT VALUES RETURNING id'
+          );
+          actualConversationId = newConversation.rows[0].id;
+
+          // Add participants to the conversation (sender and recipient)
+          if (parsedMessage.recipient) {
+            await pool.query(
+              'INSERT INTO conversation_participants (conversation_id, user_id) VALUES ($1, $2), ($1, $3)',
+              [actualConversationId, sender, parsedMessage.recipient]
+            );
+          }
+        }
+
+        // Store message in database
+        const result = await pool.query(
+          'INSERT INTO messages (conversation_id, sender_id, content) VALUES ($1, $2, $3) RETURNING id, created_at',
+          [actualConversationId, sender, text]
+        );
+
+        const messageId = result.rows[0].id;
+        const createdAt = result.rows[0].created_at;
+
+        // Prepare message to broadcast
+        const outgoingMessage = {
+          type: 'message',
+          id: messageId.toString(),
+          text,
+          sender,
+          timestamp: createdAt.getTime(),
+          conversationId: actualConversationId
+        };
+
+        // Find recipients for this conversation
+        const participantsResult = await pool.query(
+          'SELECT user_id FROM conversation_participants WHERE conversation_id = $1',
+          [actualConversationId]
+        );
+
+        // Broadcast message to all participants
+        participantsResult.rows.forEach(participant => {
+          const recipientId = participant.user_id.toString();
+          const recipientWs = clients.get(recipientId);
+
+          if (recipientWs && recipientWs.readyState === WebSocket.OPEN) {
+            // Add isMine flag for each recipient
+            const isFromCurrentUser = recipientId === sender;
+            recipientWs.send(JSON.stringify({
+              ...outgoingMessage,
+              isMine: isFromCurrentUser
+            }));
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error processing message:', error);
+      ws.send(JSON.stringify({
+        type: 'error',
+        message: 'Error processing message',
+        timestamp: Date.now()
+      }));
+    }
+  });
+
+  // Handle client disconnection
+  ws.on('close', () => {
+    clients.delete(userId);
+    console.log(`Client disconnected: User ${userId}`);
+  });
 });
+
+// Handle HTTP server upgrade (required for WebSocket)
+server.on('upgrade', (request, socket, head) => {
+  const { pathname, query } = url.parse(request.url, true);
+
+  // Only handle WebSocket connections to /chat endpoint
+  if (pathname === '/chat') {
+    // Extract userId from query parameters
+    const userId = query.userId;
+
+    if (!userId) {
+      socket.destroy();
+      return;
+    }
+
+    // Handle the WebSocket connection
+    wss.handleUpgrade(request, socket, head, (ws) => {
+      wss.emit('connection', ws, request, userId);
+    });
+  } else {
+    socket.destroy();
+  }
+});
+
+// ===========================================
+// CHAT API HELPER FUNCTIONS
+// ===========================================
+
+// Get conversation list for a user
+async function getConversationsForUser(userId) {
+  try {
+    const result = await pool.query(`
+      SELECT c.id, c.created_at,
+        ARRAY_AGG(u.username) AS participants,
+        (
+          SELECT content FROM messages
+          WHERE conversation_id = c.id
+          ORDER BY created_at DESC
+          LIMIT 1
+        ) AS last_message,
+        (
+          SELECT created_at FROM messages
+          WHERE conversation_id = c.id
+          ORDER BY created_at DESC
+          LIMIT 1
+        ) AS last_message_time
+      FROM conversations c
+      JOIN conversation_participants cp ON c.id = cp.conversation_id
+      JOIN users u ON cp.user_id = u.id
+      WHERE c.id IN (
+        SELECT conversation_id FROM conversation_participants WHERE user_id = $1
+      )
+      GROUP BY c.id
+      ORDER BY last_message_time DESC NULLS LAST
+    `, [userId]);
+
+    return result.rows;
+  } catch (error) {
+    console.error('Error fetching conversations:', error);
+    return [];
+  }
+}
+
+// Get messages for a conversation
+async function getMessagesForConversation(conversationId, userId) {
+  try {
+    const result = await pool.query(`
+      SELECT
+        m.id,
+        m.content AS text,
+        m.sender_id AS sender,
+        m.created_at AS timestamp,
+        CASE WHEN m.sender_id = $2 THEN true ELSE false END AS is_mine
+      FROM messages m
+      WHERE m.conversation_id = $1
+      ORDER BY m.created_at ASC
+    `, [conversationId, userId]);
+
+    return result.rows.map(row => ({
+      id: row.id.toString(),
+      text: row.text,
+      sender: row.sender.toString(),
+      timestamp: new Date(row.timestamp).getTime(),
+      isMine: row.is_mine
+    }));
+  } catch (error) {
+    console.error('Error fetching messages:', error);
+    return [];
+  }
+}
+
+// ===========================================
+// CHAT API ENDPOINTS
+// ===========================================
+
+/**
+ * @description Get conversation list for a user
+ * @returns List of conversations with latest message
+ */
+app.get('/conversations/:userId', async (req, res) => {
+  const userId = req.params.userId;
+
+  try {
+    const conversations = await getConversationsForUser(userId);
+    if (conversations.length === 0) {
+      return res.status(200).json({
+        message: "No conversations found",
+        data: []
+      });
+    } else {
+      return res.status(200).json({
+        message: "Conversations retrieved successfully",
+        data: conversations
+      });
+    }
+  } catch (error) {
+    console.error('Error retrieving conversations:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * @description Get messages for a conversation
+ * @returns List of messages
+ */
+app.get('/conversations/:conversationId/messages/:userId', async (req, res) => {
+  const { conversationId, userId } = req.params;
+
+  try {
+    const messages = await getMessagesForConversation(conversationId, userId);
+    return res.status(200).json({
+      message: "Messages retrieved successfully",
+      data: messages
+    });
+  } catch (error) {
+    console.error('Error retrieving messages:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * @description Create a new conversation between users
+ */
+app.post('/conversations', express.json(), async (req, res) => {
+  const { participants } = req.body;
+
+  if (!participants || !Array.isArray(participants) || participants.length < 2) {
+    return res.status(400).json({ error: 'At least two participants are required' });
+  }
+
+  try {
+    // Create new conversation
+    const newConversation = await pool.query(
+      'INSERT INTO conversations DEFAULT VALUES RETURNING id, created_at'
+    );
+    const conversationId = newConversation.rows[0].id;
+
+    // Add participants
+    const participantValues = participants.map(userId => `(${conversationId}, ${userId})`).join(', ');
+    await pool.query(`
+      INSERT INTO conversation_participants (conversation_id, user_id)
+      VALUES ${participantValues}
+    `);
+
+    return res.status(201).json({
+      message: 'Conversation created successfully',
+      data: {
+        id: conversationId,
+        created_at: newConversation.rows[0].created_at,
+        participants
+      }
+    });
+  } catch (error) {
+    console.error('Error creating conversation:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ===========================================
+// YOUR EXISTING REST API ENDPOINTS
+// ===========================================
 
 function createTables() {
   // table users
@@ -137,7 +490,7 @@ function createTables() {
 setTimeout(() => {
   createTables();
 }, 3000);
-app.use(express.json());
+
 //file upload
 //Method: POST
 // URL: http://localhost:8080/upload
@@ -358,6 +711,9 @@ app.post("/register", async (req, res) => {
   const user = req.body;
 
   try {
+    if (!user.email.toLowerCase().endsWith('@stuba.sk')) {
+      return res.status(400).json({ error: "Only @stuba.sk email addresses are allowed" });
+    }
     const existing_user = await pool.query(
       "SELECT * FROM users WHERE email = $1 and username = $2",
       [user.email, user.username]
@@ -698,4 +1054,102 @@ app.put("/post/:id/vote", async (req, res) => {
     console.error("Something went wrong when updating post vote...", e);
     return res.status(500).json({ error: "Internal server error!" });
   }
+});
+
+// Import chat functions from WebSocket server
+const { getConversationsForUser, getMessagesForConversation } = require('./wsServer');
+
+/**
+ * @description Get conversation list for a user
+ * @returns List of conversations with latest message
+ */
+app.get('/conversations/:userId', async (req, res) => {
+  const userId = req.params.userId;
+
+  try {
+    const conversations = await getConversationsForUser(userId);
+    if (conversations.length === 0) {
+      return res.status(200).json({
+        message: "No conversations found",
+        data: []
+      });
+    } else {
+      return res.status(200).json({
+        message: "Conversations retrieved successfully",
+        data: conversations
+      });
+    }
+  } catch (error) {
+    console.error('Error retrieving conversations:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * @description Get messages for a conversation
+ * @returns List of messages
+ */
+app.get('/conversations/:conversationId/messages/:userId', async (req, res) => {
+  const { conversationId, userId } = req.params;
+
+  try {
+    const messages = await getMessagesForConversation(conversationId, userId);
+    return res.status(200).json({
+      message: "Messages retrieved successfully",
+      data: messages
+    });
+  } catch (error) {
+    console.error('Error retrieving messages:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * @description Create a new conversation between users
+ */
+app.post('/conversations', async (req, res) => {
+  const { participants } = req.body;
+
+  if (!participants || !Array.isArray(participants) || participants.length < 2) {
+    return res.status(400).json({ error: 'At least two participants are required' });
+  }
+
+  try {
+    // Create new conversation
+    const newConversation = await pool.query(
+      'INSERT INTO conversations DEFAULT VALUES RETURNING id, created_at'
+    );
+    const conversationId = newConversation.rows[0].id;
+
+    // Add participants
+    const participantValues = participants.map(userId => `(${conversationId}, ${userId})`).join(', ');
+    await pool.query(`
+      INSERT INTO conversation_participants (conversation_id, user_id)
+      VALUES ${participantValues}
+    `);
+
+    return res.status(201).json({
+      message: 'Conversation created successfully',
+      data: {
+        id: conversationId,
+        created_at: newConversation.rows[0].created_at,
+        participants
+      }
+    });
+  } catch (error) {
+    console.error('Error creating conversation:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ===========================================
+// START THE SERVER
+// ===========================================
+
+// Start the server on port 8080 (will handle both HTTP and WebSocket)
+const PORT = 8080;
+server.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+  console.log(`REST API is available at http://localhost:${PORT}`);
+  console.log(`WebSocket server is available at ws://localhost:${PORT}/chat`);
 });
