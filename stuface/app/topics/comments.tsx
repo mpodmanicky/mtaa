@@ -53,15 +53,23 @@ export default function CommentsScreen() {
   const [isLoadingPost, setIsLoadingPost] = useState(true);
   const [isLoadingComments, setIsLoadingComments] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [likedPosts, setLikedPosts] = useState<string[]>([]);
+  const [likedComments, setLikedComments] = useState<string[]>([]);
 
-  // Load current user's info
   useEffect(() => {
     const loadUserData = async () => {
       try {
         const storedUsername = await AsyncStorage.getItem('username');
         const storedUserId = await AsyncStorage.getItem('userId');
+        const storedLikedPosts = await AsyncStorage.getItem('likedPosts');
+        const storedLikedComments = await AsyncStorage.getItem('likedComments');
+
         setCurrentUsername(storedUsername);
         setUserId(storedUserId);
+        setLikedPosts(storedLikedPosts ? JSON.parse(storedLikedPosts) : []);
+        setLikedComments(
+          storedLikedComments ? JSON.parse(storedLikedComments) : [],
+        );
       } catch (error) {
         console.error('Error loading user data:', error);
       }
@@ -70,14 +78,13 @@ export default function CommentsScreen() {
     loadUserData();
   }, []);
 
-  // Fetch post details
   useEffect(() => {
     if (!postId) return;
 
     const fetchPost = async () => {
       setIsLoadingPost(true);
       try {
-        const response = await fetch(`http://10.0.2.2:8080/posts/${postId}`);
+        const response = await fetch(`http://localhost:8080/posts/${postId}`);
         const result = await response.json();
 
         if (response.ok && result.data) {
@@ -107,51 +114,56 @@ export default function CommentsScreen() {
     fetchPost();
   }, [postId]);
 
-  // Fetch post comments
   useEffect(() => {
     if (!postId) return;
 
     const fetchComments = async () => {
       setIsLoadingComments(true);
       try {
-        console.log("Fetching comments for post ID:", postId);
-        const response = await fetch(`http://10.0.2.2:8080/posts/${postId}/comments`);
+        console.log('Fetching comments for post ID:', postId);
+        const response = await fetch(
+          `http://localhost:8080/posts/${postId}/comments`,
+        );
         const result = await response.json();
 
-        console.log("Raw comments response:", result);
+        console.log('Raw comments response:', result);
 
         if (response.ok && result.data) {
-          // Check if result.data is an array
           if (!Array.isArray(result.data)) {
-            console.error("Expected comments data to be an array but got:", typeof result.data);
+            console.error(
+              'Expected comments data to be an array but got:',
+              typeof result.data,
+            );
             setComments([]);
             return;
           }
 
-          console.log("Number of comments received:", result.data.length);
+          console.log('Number of comments received:', result.data.length);
 
-          // Map each comment with full inspection of data properties
           const formattedComments = result.data.map((comment: any) => {
-            console.log("Processing comment:", comment);
+            console.log('Processing comment:', comment);
 
             return {
-              id: comment.id?.toString() || "unknown",
-              username: comment.username || "Anonymous",
-              text: comment.content || "",
+              id: comment.id?.toString() || 'unknown',
+              username: comment.username || 'Anonymous',
+              text: comment.content || '',
               likes: comment.votes || 0,
               timestamp: comment.created_at
                 ? new Date(comment.created_at).toLocaleTimeString([], {
                     hour: '2-digit',
                     minute: '2-digit',
                   })
-                : "Just now",
+                : 'Just now',
             };
           });
 
-          console.log("Formatted comments:", formattedComments);
+          console.log('Formatted comments:', formattedComments);
           setComments(formattedComments);
         } else {
-          console.log('No comments found or error:', result.error || "Unknown error");
+          console.log(
+            'No comments found or error:',
+            result.error || 'Unknown error',
+          );
           setComments([]);
         }
       } catch (error) {
@@ -168,28 +180,43 @@ export default function CommentsScreen() {
   const handleLikePost = async () => {
     if (!userId || !post) return;
 
+    const postIdStr = post.id.toString();
+    const hasLiked = likedPosts.includes(postIdStr);
+
     try {
-      // Optimistically update UI
-      const newLikeCount = post.likes + 1;
+      const newLikeCount = hasLiked ? post.likes - 1 : post.likes + 1;
       setPost({ ...post, likes: newLikeCount });
 
-      // Call API to update likes
-      const response = await fetch(`http://10.0.2.2:8080/post/${post.id}/vote`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
+      const updatedLikedPosts = hasLiked
+        ? likedPosts.filter((id) => id !== postIdStr)
+        : [...likedPosts, postIdStr];
+      setLikedPosts(updatedLikedPosts);
+      await AsyncStorage.setItem(
+        'likedPosts',
+        JSON.stringify(updatedLikedPosts),
+      );
+
+      const response = await fetch(
+        `http://localhost:8080/post/${post.id}/vote`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ vote: hasLiked ? -1 : 1 }),
         },
-        body: JSON.stringify({ vote: 1 }),
-      });
+      );
 
       if (!response.ok) {
-        // Revert if the API call fails
         setPost({ ...post, likes: post.likes });
+        setLikedPosts(likedPosts);
+        await AsyncStorage.setItem('likedPosts', JSON.stringify(likedPosts));
         console.error('Failed to update post likes');
       }
     } catch (error) {
-      // Revert on network error
       setPost({ ...post, likes: post.likes });
+      setLikedPosts(likedPosts);
+      await AsyncStorage.setItem('likedPosts', JSON.stringify(likedPosts));
       console.error('Error updating post likes:', error);
     }
   };
@@ -197,98 +224,121 @@ export default function CommentsScreen() {
   const handleLikeComment = async (commentId: string) => {
     if (!userId) return;
 
-    // Find the comment
-    const comment = comments.find(c => c.id === commentId);
+    const comment = comments.find((c) => c.id === commentId);
     if (!comment) return;
 
+    const hasLiked = likedComments.includes(commentId);
+
     try {
-      // Optimistically update UI
-      const updatedComments = comments.map(c =>
-        c.id === commentId ? { ...c, likes: c.likes + 1 } : c
+      const updatedComments = comments.map((c) =>
+        c.id === commentId
+          ? { ...c, likes: hasLiked ? c.likes - 1 : c.likes + 1 }
+          : c,
       );
       setComments(updatedComments);
 
-      // Call API to update likes
-      const response = await fetch(`http://10.0.2.2:8080/comment/${commentId}/vote`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
+      const updatedLikedComments = hasLiked
+        ? likedComments.filter((id) => id !== commentId)
+        : [...likedComments, commentId];
+      setLikedComments(updatedLikedComments);
+      await AsyncStorage.setItem(
+        'likedComments',
+        JSON.stringify(updatedLikedComments),
+      );
+
+      const response = await fetch(
+        `http://localhost:8080/comment/${commentId}/vote`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ vote: hasLiked ? -1 : 1 }),
         },
-        body: JSON.stringify({ vote: 1 }),
-      });
+      );
 
       if (!response.ok) {
-        // Revert if the API call fails
         setComments(comments);
+        setLikedComments(likedComments);
+        await AsyncStorage.setItem(
+          'likedComments',
+          JSON.stringify(likedComments),
+        );
         console.error('Failed to update comment likes');
       }
     } catch (error) {
-      // Revert on network error
       setComments(comments);
+      setLikedComments(likedComments);
+      await AsyncStorage.setItem(
+        'likedComments',
+        JSON.stringify(likedComments),
+      );
       console.error('Error updating comment likes:', error);
     }
   };
 
-  // Update your handleAddComment function
-const handleAddComment = async () => {
-  if (!commentText.trim() || !userId || !postId) return;
+  const handleAddComment = async () => {
+    if (!commentText.trim() || !userId || !postId) return;
 
-  setIsSubmitting(true);
+    setIsSubmitting(true);
 
-  try {
-    console.log("Submitting comment to:", `http://10.0.2.2:8080/posts/${postId}/comments`);
-    console.log("Comment data:", { user_id: userId, content: commentText });
+    try {
+      console.log(
+        'Submitting comment to:',
+        `http://localhost:8080/posts/${postId}/comments`,
+      );
+      console.log('Comment data:', { user_id: userId, content: commentText });
 
-    const response = await fetch(`http://10.0.2.2:8080/posts/${postId}/comments`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        user_id: userId,
-        content: commentText,
-      }),
-    });
+      const response = await fetch(
+        `http://localhost:8080/posts/${postId}/comments`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            user_id: userId,
+            content: commentText,
+          }),
+        },
+      );
 
-    const result = await response.json();
-    console.log("Comment submission result:", result);
+      const result = await response.json();
+      console.log('Comment submission result:', result);
 
-    if (response.ok && result.data) {
-      // Add the new comment to the list
-      const newComment: Comment = {
-        id: result.data.id.toString(),
-        username: currentUsername || 'You',
-        text: result.data.content,
-        likes: 0,
-        timestamp: new Date().toLocaleTimeString([], {
-          hour: '2-digit',
-          minute: '2-digit',
-        }),
-      };
+      if (response.ok && result.data) {
+        const newComment: Comment = {
+          id: result.data.id.toString(),
+          username: currentUsername || 'You',
+          text: result.data.content,
+          likes: 0,
+          timestamp: new Date().toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+        };
 
-      setComments(prevComments => [newComment, ...prevComments]);
+        setComments((prevComments) => [newComment, ...prevComments]);
 
-      // Update post comment count
-      if (post) {
-        setPost({
-          ...post,
-          comments: post.comments + 1,
-        });
+        if (post) {
+          setPost({
+            ...post,
+            comments: post.comments + 1,
+          });
+        }
+
+        setCommentText('');
+      } else {
+        console.error('Error adding comment:', result.error);
+        Alert.alert('Error', 'Failed to add comment. Please try again.');
       }
-
-      // Clear the input
-      setCommentText('');
-    } else {
-      console.error('Error adding comment:', result.error);
-      Alert.alert('Error', 'Failed to add comment. Please try again.');
+    } catch (error) {
+      console.error('Error adding comment:', error);
+      Alert.alert('Connection Error', 'Could not connect to the server');
+    } finally {
+      setIsSubmitting(false);
     }
-  } catch (error) {
-    console.error('Error adding comment:', error);
-    Alert.alert('Connection Error', 'Could not connect to the server');
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+  };
 
   return (
     <>
@@ -327,7 +377,6 @@ const handleAddComment = async () => {
                 >
                   {post && (
                     <View>
-                      {/* Original Post */}
                       <View style={styles.postCard}>
                         <View style={styles.usernameContainer}>
                           <Ionicons
@@ -341,33 +390,54 @@ const handleAddComment = async () => {
                         <View style={styles.bodyContainer}>
                           <Text style={styles.body}>{post.body}</Text>
                           <View style={styles.stats}>
-                            <Text style={[styles.statText, styles.timestampText]}>
+                            <Text
+                              style={[styles.statText, styles.timestampText]}
+                            >
                               {post.timestamp}
                             </Text>
                             <TouchableWithoutFeedback onPress={handleLikePost}>
                               <View style={styles.statItem}>
-                                <Ionicons name="thumbs-up-outline" size={16} color="#000" />
-                                <Text style={styles.statText}>{post.likes}</Text>
+                                <Ionicons
+                                  name={
+                                    likedPosts.includes(post.id.toString())
+                                      ? 'thumbs-up'
+                                      : 'thumbs-up-outline'
+                                  }
+                                  size={16}
+                                  color="#000"
+                                />
+                                <Text style={styles.statText}>
+                                  {post.likes}
+                                </Text>
                               </View>
                             </TouchableWithoutFeedback>
                             <View style={styles.statItem}>
-                              <Ionicons name="chatbubble-outline" size={16} color="#000" />
-                              <Text style={styles.statText}>{post.comments}</Text>
+                              <Ionicons
+                                name="chatbubble-outline"
+                                size={16}
+                                color="#000"
+                              />
+                              <Text style={styles.statText}>
+                                {post.comments}
+                              </Text>
                             </View>
                           </View>
                         </View>
                       </View>
 
-                      {/* Comment Section Header */}
                       <View style={styles.commentSectionHeader}>
                         <Text style={styles.commentSectionTitle}>Comments</Text>
                       </View>
 
-                      {/* Comments List */}
                       {isLoadingComments ? (
                         <View style={styles.loadingCommentsContainer}>
-                          <ActivityIndicator size="small" color={theme.colors.primary} />
-                          <Text style={styles.loadingText}>Loading comments...</Text>
+                          <ActivityIndicator
+                            size="small"
+                            color={theme.colors.primary}
+                          />
+                          <Text style={styles.loadingText}>
+                            Loading comments...
+                          </Text>
                         </View>
                       ) : comments.length > 0 ? (
                         comments.map((comment) => (
@@ -379,18 +449,39 @@ const handleAddComment = async () => {
                                 color={theme.colors.text}
                                 style={styles.userIcon}
                               />
-                              <Text style={styles.username}>{comment.username}</Text>
+                              <Text style={styles.username}>
+                                {comment.username}
+                              </Text>
                             </View>
                             <View style={styles.commentBodyContainer}>
-                              <Text style={styles.body}>{comment.text}</Text>
+                              <Text style={styles.commentText}>
+                                {comment.text}
+                              </Text>
                               <View style={styles.stats}>
-                                <Text style={[styles.statText, styles.timestampText]}>
+                                <Text
+                                  style={[
+                                    styles.statText,
+                                    styles.timestampText,
+                                  ]}
+                                >
                                   {comment.timestamp}
                                 </Text>
-                                <TouchableWithoutFeedback onPress={() => handleLikeComment(comment.id)}>
+                                <TouchableWithoutFeedback
+                                  onPress={() => handleLikeComment(comment.id)}
+                                >
                                   <View style={styles.statItem}>
-                                    <Ionicons name="thumbs-up-outline" size={14} color="#000" />
-                                    <Text style={styles.statText}>{comment.likes}</Text>
+                                    <Ionicons
+                                      name={
+                                        likedComments.includes(comment.id)
+                                          ? 'thumbs-up'
+                                          : 'thumbs-up-outline'
+                                      }
+                                      size={14}
+                                      color="#000"
+                                    />
+                                    <Text style={styles.statText}>
+                                      {comment.likes}
+                                    </Text>
                                   </View>
                                 </TouchableWithoutFeedback>
                               </View>
@@ -403,20 +494,19 @@ const handleAddComment = async () => {
                         </Text>
                       )}
 
-                      {/* Add padding at the bottom for safe scrolling above the input */}
                       <View style={{ height: 80 }} />
                     </View>
                   )}
                 </ScrollView>
 
-                {/* Comment Input - Fixed at bottom */}
-                <View style={[
-                  styles.inputContainer,
-                  {
-                    // Increase bottom padding on Android to lift above taskbar
-                    bottom: Platform.OS === 'android' ? 50 : 0
-                  }
-                ]}>
+                <View
+                  style={[
+                    styles.inputContainer,
+                    {
+                      bottom: Platform.OS === 'android' ? 50 : 0,
+                    },
+                  ]}
+                >
                   <View style={styles.inputWrapper}>
                     <TextInput
                       style={styles.input}
@@ -432,7 +522,8 @@ const handleAddComment = async () => {
                   <TouchableOpacity
                     style={[
                       styles.sendButton,
-                      (!commentText.trim() || isSubmitting) && styles.sendButtonDisabled
+                      (!commentText.trim() || isSubmitting) &&
+                        styles.sendButtonDisabled,
                     ]}
                     onPress={handleAddComment}
                     disabled={!commentText.trim() || isSubmitting}
@@ -453,7 +544,6 @@ const handleAddComment = async () => {
   );
 }
 
-// Add or update these styles
 const dynamicStyles = (theme: any) =>
   StyleSheet.create({
     container: {
@@ -466,7 +556,7 @@ const dynamicStyles = (theme: any) =>
     },
     scrollContent: {
       padding: 15,
-      paddingBottom: Platform.OS === 'android' ? 150 : 120, // Extra padding for Android
+      paddingBottom: Platform.OS === 'android' ? 150 : 120,
     },
     inputContainer: {
       flexDirection: 'row',
@@ -475,25 +565,12 @@ const dynamicStyles = (theme: any) =>
       paddingHorizontal: 16,
       backgroundColor: theme.colors.secondary,
       marginBottom: 20,
-      // borderTopWidth: 1,
-      // borderTopColor: theme.colors.border,
-      // position: 'absolute',
-      // left: 0,
-      // right: 0,
-      // bottom: Platform.OS === 'android' ? 50 : 0, // Increased for Android
-      // elevation: 5,
-      // shadowColor: '#000',
-      // shadowOffset: { width: 0, height: -2 },
-      // shadowOpacity: 0.1,
-      // shadowRadius: 2,
-      // borderTopLeftRadius: 20,  // Rounded top corners
-      // borderTopRightRadius: 20,
     },
     inputWrapper: {
       flex: 1,
       marginRight: 10,
       backgroundColor: theme.colors.card,
-      borderRadius: 25, // More rounded corners
+      borderRadius: 25,
       paddingHorizontal: 15,
       paddingVertical: 0,
       shadowColor: '#000',
@@ -507,8 +584,8 @@ const dynamicStyles = (theme: any) =>
       padding: 24,
       color: theme.colors.text,
       maxHeight: 80,
-      minHeight: 36, // Ensure consistent height
-      paddingTop: 8, // Better text positioning
+      minHeight: 36,
+      paddingTop: 8,
       paddingBottom: 8,
     },
     sendButton: {
@@ -522,11 +599,11 @@ const dynamicStyles = (theme: any) =>
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.2,
       shadowRadius: 2,
-      elevation: 3, // Add shadow on Android
+      elevation: 3,
     },
     sendButtonDisabled: {
       backgroundColor: theme.colors.primary + '80',
-      shadowOpacity: 0.1, // Reduced shadow when disabled
+      shadowOpacity: 0.1,
       elevation: 1,
     },
     background: {
@@ -611,31 +688,41 @@ const dynamicStyles = (theme: any) =>
       minHeight: 80,
     },
     commentBodyContainer: {
-      backgroundColor: theme.colors.card,
-      borderRadius: 10,
-      padding: 15,
-      minHeight: 50,
+      backgroundColor: '#FFFFFF',
+      borderRadius: 15,
+      padding: 10,
+      marginBottom: 5,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 2,
+      elevation: 2,
     },
     body: {
       fontSize: 14,
       color: theme.colors.text,
       lineHeight: 20,
     },
+    commentText: {
+      fontSize: 14,
+      color: '#000000',
+      lineHeight: 20,
+    },
     stats: {
       flexDirection: 'row',
       justifyContent: 'flex-end',
-      marginTop: 10,
+      marginTop: 5,
       alignItems: 'center',
     },
     statItem: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginLeft: 15,
+      marginLeft: 10,
     },
     statText: {
       fontSize: 12,
       color: theme.colors.primary,
-      marginLeft: 4,
+      marginLeft: 3,
     },
     timestampText: {
       color: theme.colors.text + '80',
@@ -657,43 +744,4 @@ const dynamicStyles = (theme: any) =>
       color: theme.colors.text + '80',
       fontStyle: 'italic',
     },
-    // inputWrapper: {
-    //   flex: 1,
-    //   marginRight: 10,
-    //   backgroundColor: theme.colors.card,
-    //   borderRadius: 25, // More rounded corners
-    //   paddingHorizontal: 15,
-    //   paddingVertical: 8,
-    //   shadowColor: '#000',
-    //   shadowOffset: { width: 0, height: 1 },
-    //   shadowOpacity: 0.1,
-    //   shadowRadius: 1,
-    //   elevation: 2,
-    // },
-    // input: {
-    //   fontSize: 14,
-    //   color: theme.colors.text,
-    //   maxHeight: 80,
-    //   minHeight: 36, // Ensure consistent height
-    //   paddingTop: 8, // Better text positioning
-    //   paddingBottom: 8,
-    // },
-    // sendButton: {
-    //   width: 40,
-    //   height: 40,
-    //   borderRadius: 20,
-    //   backgroundColor: theme.colors.primary,
-    //   justifyContent: 'center',
-    //   alignItems: 'center',
-    //   shadowColor: '#000',
-    //   shadowOffset: { width: 0, height: 2 },
-    //   shadowOpacity: 0.2,
-    //   shadowRadius: 2,
-    //   elevation: 3, // Add shadow on Android
-    // },
-    // sendButtonDisabled: {
-    //   backgroundColor: theme.colors.primary + '80',
-    //   shadowOpacity: 0.1, // Reduced shadow when disabled
-    //   elevation: 1,
-    // },
   });

@@ -9,9 +9,11 @@ export default function SearchScreen() {
     <ImageBackground
       source={theme.colors.background}
       resizeMode="cover"
-      style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+      style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
     >
-      <Text style={{ color: theme.colors.text, fontSize: 24 }}>Topics Screen</Text>
+      <Text style={{ color: theme.colors.text, fontSize: 24 }}>
+        Topics Screen
+      </Text>
     </ImageBackground>
   );
 }

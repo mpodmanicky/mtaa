@@ -35,14 +35,14 @@ export default function Home() {
   const fetchTopics = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch('http://10.0.2.2:8080/topics');
+      const response = await fetch('http://localhost:8080/topics');
       const result = await response.json();
 
       if (response.ok && result.data) {
         // Transform the data to match our Topic interface
         const formattedTopics = result.data.map((topic: any) => ({
           id: topic.id.toString(),
-          name: topic.name
+          name: topic.name,
         }));
         setTopics(formattedTopics);
       } else {
@@ -57,13 +57,13 @@ export default function Home() {
         ]);
 
         Alert.alert(
-          "Connection Error",
-          "Could not load topics from server. Using default topics instead.",
-          [{ text: "OK" }]
+          'Connection Error',
+          'Could not load topics from server. Using default topics instead.',
+          [{ text: 'OK' }],
         );
       }
     } catch (error) {
-      console.error("Error loading topics:", error);
+      console.error('Error loading topics:', error);
       // Use default topics as fallback
       setTopics([
         { id: 'dormitory', name: 'Dormitory' },
@@ -74,9 +74,9 @@ export default function Home() {
       ]);
 
       Alert.alert(
-        "Connection Error",
-        "Could not connect to the server. Using default topics instead.",
-        [{ text: "OK" }]
+        'Connection Error',
+        'Could not connect to the server. Using default topics instead.',
+        [{ text: 'OK' }],
       );
     } finally {
       setIsLoading(false);

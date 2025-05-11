@@ -33,7 +33,7 @@ export default function CreateScreen() {
   const [selectedCategory, setSelectedCategory] = useState('general');
   const [postText, setPostText] = useState('');
   const [location, setLocation] = useState<Location.LocationObject | null>(
-    null
+    null,
   );
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [placeName, setPlaceName] = useState<string | null>(null);
@@ -71,7 +71,7 @@ export default function CreateScreen() {
   // Function to fetch topics from the backend
   const fetchTopics = async () => {
     try {
-      const response = await fetch('http://10.0.2.2:8080/topics');
+      const response = await fetch('http://localhost:8080/topics');
       const result = await response.json();
 
       if (response.ok && result.data) {
@@ -122,7 +122,7 @@ export default function CreateScreen() {
       console.log('Submitting post data:', postData);
 
       // Send post data to server
-      const response = await fetch('http://10.0.2.2:8080/posts', {
+      const response = await fetch('http://localhost:8080/posts', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -163,7 +163,7 @@ export default function CreateScreen() {
 
     const place = await getPlaceName(
       location.coords.latitude,
-      location.coords.longitude
+      location.coords.longitude,
     );
     setPlaceName(place);
   }
@@ -193,7 +193,7 @@ export default function CreateScreen() {
         Alert.alert(
           'Camera Permission Required',
           'Please allow camera access to take pictures for your post.',
-          [{ text: 'OK' }]
+          [{ text: 'OK' }],
         );
         return;
       }
@@ -210,7 +210,7 @@ export default function CreateScreen() {
       Alert.alert(
         'Gallery Permission Required',
         'Please allow access to your gallery to select photos.',
-        [{ text: 'OK' }]
+        [{ text: 'OK' }],
       );
       return;
     }
@@ -330,7 +330,7 @@ export default function CreateScreen() {
               {/* Post button */}
               <View style={styles.buttonContainer}>
                 <Buttons
-                  title={isSubmitting ? "Posting..." : "Post"}
+                  title={isSubmitting ? 'Posting...' : 'Post'}
                   onPress={handlePostSubmission}
                 />
               </View>
@@ -412,7 +412,7 @@ const dynamicStyles = (theme: any) =>
     },
     safeArea: {
       flex: 1,
-      paddingTop: StatusBar.currentHeight || 10
+      paddingTop: StatusBar.currentHeight || 10,
     },
     scrollContent: {
       padding: 20,

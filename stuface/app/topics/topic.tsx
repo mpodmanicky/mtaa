@@ -37,7 +37,9 @@ export default function TopicScreen() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [currentUsername, setCurrentUsername] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
-  const [likedPosts, setLikedPosts] = useState<{ [postId: string]: boolean }>({});
+  const [likedPosts, setLikedPosts] = useState<{ [postId: string]: boolean }>(
+    {},
+  );
   const [isLoading, setIsLoading] = useState(true);
 
   // Load current user's username and ID
@@ -68,7 +70,7 @@ export default function TopicScreen() {
       setIsLoading(true);
 
       // Fetch posts for the topic
-      const response = await fetch(`http://10.0.2.2:8080/topics/${id}/posts`);
+      const response = await fetch(`http://localhost:8080/topics/${id}/posts`);
       const result = await response.json();
 
       if (response.ok && result.data) {
@@ -82,7 +84,7 @@ export default function TopicScreen() {
             comments: post.comment_count || 0,
             timestamp: new Date(post.created_at).toLocaleTimeString([], {
               hour: '2-digit',
-              minute: '2-digit'
+              minute: '2-digit',
             }),
             location: post.location || undefined, // Map the location field
           };
@@ -111,8 +113,11 @@ export default function TopicScreen() {
         body: 'Could not load posts from server. This is a fallback post.',
         likes: 0,
         comments: 0,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      }
+        timestamp: new Date().toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+      },
     ]);
   };
 
@@ -139,18 +144,21 @@ export default function TopicScreen() {
         prevPosts.map((post) =>
           post.id === postId
             ? { ...post, likes: isLiking ? post.likes + 1 : post.likes - 1 }
-            : post
-        )
+            : post,
+        ),
       );
 
       // Update vote on server
-      const response = await fetch(`http://10.0.2.2:8080/post/${postId}/vote`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
+      const response = await fetch(
+        `http://localhost:8080/post/${postId}/vote`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ vote: voteValue }),
         },
-        body: JSON.stringify({ vote: voteValue })
-      });
+      );
 
       if (!response.ok) {
         // If server update fails, revert the optimistic update
@@ -169,8 +177,8 @@ export default function TopicScreen() {
           prevPosts.map((post) =>
             post.id === postId
               ? { ...post, likes: isLiking ? post.likes - 1 : post.likes + 1 }
-              : post
-          )
+              : post,
+          ),
         );
       }
     } catch (error) {
@@ -229,7 +237,9 @@ export default function TopicScreen() {
                       {post.location && (
                         <View style={styles.locationContainer}>
                           <Ionicons name="location" size={14} color="#0066FF" />
-                          <Text style={styles.locationText}>{post.location}</Text>
+                          <Text style={styles.locationText}>
+                            {post.location}
+                          </Text>
                         </View>
                       )}
 
@@ -249,7 +259,9 @@ export default function TopicScreen() {
                           </View>
                         </TouchableWithoutFeedback>
                         <TouchableWithoutFeedback
-                          onPress={() => handleCommentPress(post.id, post.username)}
+                          onPress={() =>
+                            handleCommentPress(post.id, post.username)
+                          }
                         >
                           <View style={styles.statItem}>
                             <Image
