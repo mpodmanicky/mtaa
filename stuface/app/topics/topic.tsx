@@ -10,11 +10,12 @@ import {
   TouchableOpacity,
   Image,
   TouchableWithoutFeedback,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useTheme } from '@/context/ThemeContex';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import PillBox from '@/components/PillBox';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Define post type
@@ -30,201 +31,144 @@ interface Post {
 export default function TopicScreen() {
   const { theme } = useTheme();
   const styles = dynamicStyles(theme);
-  const { id } = useLocalSearchParams();
+  const { id, name } = useLocalSearchParams();
   const router = useRouter();
   const [posts, setPosts] = useState<Post[]>([]);
   const [currentUsername, setCurrentUsername] = useState<string | null>(null);
-  const [likedPosts, setLikedPosts] = useState<{ [postId: string]: boolean }>(
-    {}
-  );
+  const [userId, setUserId] = useState<string | null>(null);
+  const [likedPosts, setLikedPosts] = useState<{ [postId: string]: boolean }>({});
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Load current user's username
+  // Load current user's username and ID
   useEffect(() => {
-    const loadUsername = async () => {
+    const loadUserData = async () => {
       try {
         const storedUsername = await AsyncStorage.getItem('username');
+        const storedUserId = await AsyncStorage.getItem('userId');
         setCurrentUsername(storedUsername);
+        setUserId(storedUserId);
       } catch (error) {
-        console.error('Error loading username:', error);
+        console.error('Error loading user data:', error);
       }
     };
 
-    loadUsername();
+    loadUserData();
   }, []);
 
-  // Load posts based on topic id
+  // Fetch posts for the selected topic
   useEffect(() => {
-    if (id === 'dormitory') {
-      setPosts([
-        {
-          id: '1',
-          username: 'turcio',
-          body: 'Post body',
-          likes: 10,
-          comments: 10,
-          timestamp: '10:20',
-        },
-        {
-          id: '2',
-          username: 'ZK0T017',
-          body: 'Post body',
-          likes: 10,
-          comments: 10,
-          timestamp: '13:10',
-        },
-        {
-          id: '3',
-          username: 'Eesordi',
-          body: 'Post body',
-          likes: 10,
-          comments: 2,
-          timestamp: '7:10',
-        },
-        {
-          id: '4',
-          username: 'otetef',
-          body: 'Post body',
-          likes: 3,
-          comments: 18,
-          timestamp: '23:10',
-        },
-      ]);
-    } else if (id === 'university') {
-      setPosts([
-        {
-          id: '1',
-          username: 'turcio',
-          body: 'Post body',
-          likes: 10,
-          comments: 10,
-          timestamp: '10:20',
-        },
-        {
-          id: '2',
-          username: 'ZK0T017',
-          body: 'Post body',
-          likes: 10,
-          comments: 10,
-          timestamp: '13:10',
-        },
-        {
-          id: '3',
-          username: 'Eesordi',
-          body: 'Post body',
-          likes: 10,
-          comments: 2,
-          timestamp: '7:10',
-        },
-        {
-          id: '4',
-          username: 'otetef',
-          body: 'Post body',
-          likes: 3,
-          comments: 18,
-          timestamp: '23:10',
-        },
-      ]);
-    } else if (id === 'canteen') {
-      setPosts([
-        {
-          id: '1',
-          username: 'turcio',
-          body: 'Post body',
-          likes: 10,
-          comments: 10,
-          timestamp: '10:20',
-        },
-        {
-          id: '2',
-          username: 'ZK0T017',
-          body: 'Post body',
-          likes: 10,
-          comments: 10,
-          timestamp: '13:10',
-        },
-        {
-          id: '3',
-          username: 'Eesordi',
-          body: 'Post body',
-          likes: 10,
-          comments: 2,
-          timestamp: '7:10',
-        },
-        {
-          id: '4',
-          username: 'otetef',
-          body: 'Post body',
-          likes: 3,
-          comments: 18,
-          timestamp: '23:10',
-        },
-      ]);
-    } else if (id === 'library') {
-      setPosts([
-        {
-          id: '1',
-          username: 'turcio',
-          body: 'Post body',
-          likes: 10,
-          comments: 10,
-          timestamp: '10:20',
-        },
-        {
-          id: '2',
-          username: 'ZK0T017',
-          body: 'Post body',
-          likes: 10,
-          comments: 10,
-          timestamp: '13:10',
-        },
-        {
-          id: '3',
-          username: 'Eesordi',
-          body: 'Post body',
-          likes: 10,
-          comments: 2,
-          timestamp: '7:10',
-        },
-        {
-          id: '4',
-          username: 'otetef',
-          body: 'Post body',
-          likes: 3,
-          comments: 18,
-          timestamp: '23:10',
-        },
-      ]);
-    } else {
-      setPosts([]); // Default to empty if topic is unknown
-    }
+    fetchPostsForTopic();
   }, [id]);
 
-  const handleLikePress = (postId: string) => {
-    if (!currentUsername) return; // Don't allow liking if username isn't loaded
+  const fetchPostsForTopic = async () => {
+    if (!id) return;
 
-    setLikedPosts((prev) => {
-      const hasLiked = !!prev[postId];
-      const updatedLikes = { ...prev };
+    try {
+      setIsLoading(true);
 
-      if (hasLiked) {
-        // Unlike: Remove the like
-        delete updatedLikes[postId];
+      // Fetch posts for the topic
+      const response = await fetch(`http://10.0.2.2:8080/topics/${id}/posts`);
+      const result = await response.json();
+
+      if (response.ok && result.data) {
+        // Transform the data to match our Post interface
+        const formattedPosts = result.data.map((post: any) => ({
+          id: post.id.toString(),
+          username: post.username,
+          body: post.content,
+          likes: post.votes,
+          comments: post.comment_count || 0,
+          timestamp: new Date(post.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }));
+
+        setPosts(formattedPosts);
       } else {
-        // Like: Add the like
-        updatedLikes[postId] = true;
+        console.log('Error fetching posts or no posts found:', result.error);
+        // Use fallback posts if fetch fails
+        useFallbackPosts();
       }
+    } catch (error) {
+      console.error('Error fetching posts:', error);
+      useFallbackPosts();
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-      // Update the posts state with the new like count
+  // Fallback posts when API fails
+  const useFallbackPosts = () => {
+    setPosts([
+      {
+        id: '1',
+        username: 'turcio',
+        body: 'Could not load posts from server. This is a fallback post.',
+        likes: 0,
+        comments: 0,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }
+    ]);
+  };
+
+  const handleLikePress = async (postId: string) => {
+    if (!currentUsername || !userId) return; // Don't allow liking if user data isn't loaded
+
+    try {
+      // Determine if the user is liking or unliking
+      const isLiking = !likedPosts[postId];
+      const voteValue = isLiking ? 1 : -1;
+
+      // Optimistically update UI
+      setLikedPosts((prev) => {
+        const updatedLikes = { ...prev };
+        if (isLiking) {
+          updatedLikes[postId] = true;
+        } else {
+          delete updatedLikes[postId];
+        }
+        return updatedLikes;
+      });
+
       setPosts((prevPosts) =>
         prevPosts.map((post) =>
           post.id === postId
-            ? { ...post, likes: hasLiked ? post.likes - 1 : post.likes + 1 }
+            ? { ...post, likes: isLiking ? post.likes + 1 : post.likes - 1 }
             : post
         )
       );
 
-      return updatedLikes;
-    });
+      // Update vote on server
+      const response = await fetch(`http://10.0.2.2:8080/post/${postId}/vote`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ vote: voteValue })
+      });
+
+      if (!response.ok) {
+        // If server update fails, revert the optimistic update
+        console.log('Failed to update vote on server');
+        setLikedPosts((prev) => {
+          const updatedLikes = { ...prev };
+          if (!isLiking) {
+            updatedLikes[postId] = true;
+          } else {
+            delete updatedLikes[postId];
+          }
+          return updatedLikes;
+        });
+
+        setPosts((prevPosts) =>
+          prevPosts.map((post) =>
+            post.id === postId
+              ? { ...post, likes: isLiking ? post.likes - 1 : post.likes + 1 }
+              : post
+          )
+        );
+      }
+    } catch (error) {
+      console.error('Error updating post vote:', error);
+    }
   };
 
   const handleCommentPress = (postId: string, username: string) => {
@@ -232,22 +176,6 @@ export default function TopicScreen() {
       pathname: '/topics/comments',
       params: { postId, username },
     });
-  };
-
-  // Map topic id to display name
-  const getTopicDisplayName = (topicId: string | string[] | undefined) => {
-    switch (topicId) {
-      case 'dormitory':
-        return 'Dormitory Topic';
-      case 'university':
-        return 'University Topic';
-      case 'canteen':
-        return 'Canteen Topic';
-      case 'library':
-        return 'Library Topic';
-      default:
-        return 'Topic';
-    }
   };
 
   return (
@@ -266,53 +194,65 @@ export default function TopicScreen() {
             >
               <Ionicons name="arrow-back" size={24} color="white" />
             </TouchableOpacity>
-            <Text style={styles.headerText}>{getTopicDisplayName(id)}</Text>
+            <Text style={styles.headerText}>{name || 'Topic'}</Text>
           </View>
-          <ScrollView contentContainerStyle={styles.scrollContent}>
-            {posts.map((post) => (
-              <View key={post.id} style={styles.postCard}>
-                <View style={styles.usernameContainer}>
-                  <Ionicons
-                    name="send"
-                    size={16}
-                    color={theme.colors.text}
-                    style={styles.airplaneIcon}
-                  />
-                  <Text style={styles.username}>{post.username}</Text>
-                </View>
-                <View style={styles.bodyContainer}>
-                  <Text style={styles.body}>{post.body}</Text>
-                  <View style={styles.stats}>
-                    <Text style={[styles.statText, styles.timestampText]}>
-                      {post.timestamp}
-                    </Text>
-                    <TouchableWithoutFeedback
-                      onPress={() => handleLikePress(post.id)}
-                    >
-                      <View style={styles.statItem}>
-                        <Image
-                          source={require('@/assets/images/like_topik.png')}
-                          style={styles.statIcon}
-                        />
-                        <Text style={styles.statText}>{post.likes}</Text>
+
+          {isLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={theme.colors.primary} />
+              <Text style={styles.loadingText}>Loading posts...</Text>
+            </View>
+          ) : (
+            <ScrollView contentContainerStyle={styles.scrollContent}>
+              {posts.length > 0 ? (
+                posts.map((post) => (
+                  <View key={post.id} style={styles.postCard}>
+                    <View style={styles.usernameContainer}>
+                      <Ionicons
+                        name="send"
+                        size={16}
+                        color={theme.colors.text}
+                        style={styles.airplaneIcon}
+                      />
+                      <Text style={styles.username}>{post.username}</Text>
+                    </View>
+                    <View style={styles.bodyContainer}>
+                      <Text style={styles.body}>{post.body}</Text>
+                      <View style={styles.stats}>
+                        <Text style={[styles.statText, styles.timestampText]}>
+                          {post.timestamp}
+                        </Text>
+                        <TouchableWithoutFeedback
+                          onPress={() => handleLikePress(post.id)}
+                        >
+                          <View style={styles.statItem}>
+                            <Image
+                              source={require('@/assets/images/like_topik.png')}
+                              style={styles.statIcon}
+                            />
+                            <Text style={styles.statText}>{post.likes}</Text>
+                          </View>
+                        </TouchableWithoutFeedback>
+                        <TouchableWithoutFeedback
+                          onPress={() => handleCommentPress(post.id, post.username)}
+                        >
+                          <View style={styles.statItem}>
+                            <Image
+                              source={require('@/assets/images/comment.png')}
+                              style={styles.statIcon}
+                            />
+                            <Text style={styles.statText}>{post.comments}</Text>
+                          </View>
+                        </TouchableWithoutFeedback>
                       </View>
-                    </TouchableWithoutFeedback>
-                    <TouchableWithoutFeedback
-                      onPress={() => handleCommentPress(post.id, post.username)}
-                    >
-                      <View style={styles.statItem}>
-                        <Image
-                          source={require('@/assets/images/comment.png')}
-                          style={styles.statIcon}
-                        />
-                        <Text style={styles.statText}>{post.comments}</Text>
-                      </View>
-                    </TouchableWithoutFeedback>
+                    </View>
                   </View>
-                </View>
-              </View>
-            ))}
-          </ScrollView>
+                ))
+              ) : (
+                <Text style={styles.emptyText}>No posts yet in this topic</Text>
+              )}
+            </ScrollView>
+          )}
         </SafeAreaView>
       </ImageBackground>
     </>
@@ -408,5 +348,22 @@ const dynamicStyles = (theme: any) =>
     },
     timestampText: {
       color: '#000000',
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    loadingText: {
+      marginTop: 10,
+      fontSize: 16,
+      color: theme.colors.text,
+    },
+    emptyText: {
+      textAlign: 'center',
+      marginTop: 50,
+      fontSize: 16,
+      color: theme.colors.text,
+      opacity: 0.7,
     },
   });
