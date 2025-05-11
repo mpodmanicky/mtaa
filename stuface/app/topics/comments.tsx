@@ -15,11 +15,13 @@ import {
   TouchableWithoutFeedback,
   ActivityIndicator,
   Alert,
+  RefreshControl
 } from 'react-native';
 import { useTheme } from '@/context/ThemeContex';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {ENV} from "@/utils/env"
 
 // Define post type
 interface Post {
@@ -29,6 +31,8 @@ interface Post {
   likes: number;
   comments: number;
   timestamp: string;
+  location?: string;
+  has_image?: boolean;
 }
 
 // Define comment type
@@ -53,6 +57,7 @@ export default function CommentsScreen() {
   const [isLoadingPost, setIsLoadingPost] = useState(true);
   const [isLoadingComments, setIsLoadingComments] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Load current user's info
   useEffect(() => {
@@ -70,100 +75,132 @@ export default function CommentsScreen() {
     loadUserData();
   }, []);
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+
+    try {
+      await Promise.all([
+        fetchPost(),
+        fetchComments()
+      ])
+    } catch (e) {
+      console.error("Error during refresh: ", e)
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
   // Fetch post details
   useEffect(() => {
-    if (!postId) return;
-
-    const fetchPost = async () => {
-      setIsLoadingPost(true);
-      try {
-        const response = await fetch(`http://10.0.2.2:8080/posts/${postId}`);
-        const result = await response.json();
-
-        if (response.ok && result.data) {
-          setPost({
-            id: result.data.id.toString(),
-            username: result.data.username,
-            body: result.data.content,
-            likes: result.data.votes,
-            comments: result.data.comment_count || 0,
-            timestamp: new Date(result.data.created_at).toLocaleTimeString([], {
-              hour: '2-digit',
-              minute: '2-digit',
-            }),
-          });
-        } else {
-          console.error('Error fetching post:', result.error);
-          Alert.alert('Error', 'Failed to load post details');
-        }
-      } catch (error) {
-        console.error('Error fetching post:', error);
-        Alert.alert('Connection Error', 'Could not connect to the server');
-      } finally {
-        setIsLoadingPost(false);
-      }
-    };
-
     fetchPost();
-  }, [postId]);
+  }, [postId, username]);
 
   // Fetch post comments
   useEffect(() => {
-    if (!postId) return;
-
-    const fetchComments = async () => {
-      setIsLoadingComments(true);
-      try {
-        console.log("Fetching comments for post ID:", postId);
-        const response = await fetch(`http://10.0.2.2:8080/posts/${postId}/comments`);
-        const result = await response.json();
-
-        console.log("Raw comments response:", result);
-
-        if (response.ok && result.data) {
-          // Check if result.data is an array
-          if (!Array.isArray(result.data)) {
-            console.error("Expected comments data to be an array but got:", typeof result.data);
-            setComments([]);
-            return;
-          }
-
-          console.log("Number of comments received:", result.data.length);
-
-          // Map each comment with full inspection of data properties
-          const formattedComments = result.data.map((comment: any) => {
-            console.log("Processing comment:", comment);
-
-            return {
-              id: comment.id?.toString() || "unknown",
-              username: comment.username || "Anonymous",
-              text: comment.content || "",
-              likes: comment.votes || 0,
-              timestamp: comment.created_at
-                ? new Date(comment.created_at).toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })
-                : "Just now",
-            };
-          });
-
-          console.log("Formatted comments:", formattedComments);
-          setComments(formattedComments);
-        } else {
-          console.log('No comments found or error:', result.error || "Unknown error");
-          setComments([]);
-        }
-      } catch (error) {
-        console.error('Error fetching comments:', error);
-        setComments([]);
-      } finally {
-        setIsLoadingComments(false);
-      }
-    };
-
     fetchComments();
   }, [postId]);
+
+  // Move your fetch post logic to a separate function
+const fetchPost = async () => {
+  if (!postId) return;
+
+  setIsLoadingPost(true);
+  try {
+    const response = await fetch(`${ENV.API_URL}/posts/${postId}`);
+    const result = await response.json();
+
+    console.log("Post details response:", result.data);
+
+    if (response.ok && result.data) {
+      setPost({
+        id: result.data.id.toString(),
+        username: result.data.username || username as string,
+        body: result.data.content,
+        likes: result.data.votes,
+        comments: result.data.comment_count || 0,
+        timestamp: new Date(result.data.created_at).toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+        has_image: result.data.has_image || false,
+        location: result.data.location || undefined,
+      });
+    } else {
+      console.error('Error fetching post:', result.error);
+
+      // Create fallback post with data from params
+      if (postId && username) {
+        setPost({
+          id: postId as string,
+          username: username as string,
+          body: "Content not available",
+          likes: 0,
+          comments: 0,
+          timestamp: new Date().toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+          has_image: false,
+          location: undefined,
+        });
+      } else {
+        Alert.alert('Error', 'Failed to load post details');
+      }
+    }
+  } catch (error) {
+    console.error('Error fetching post:', error);
+    Alert.alert('Connection Error', 'Could not connect to the server');
+  } finally {
+    setIsLoadingPost(false);
+  }
+};
+
+// Move your fetch comments logic to a separate function
+const fetchComments = async () => {
+  if (!postId) return;
+
+  setIsLoadingComments(true);
+  try {
+    console.log("Fetching comments for post ID:", postId);
+    const response = await fetch(`${ENV.API_URL}/posts/${postId}/comments`);
+    const result = await response.json();
+
+    console.log("Raw comments response:", result);
+
+    if (response.ok && result.data) {
+      if (!Array.isArray(result.data)) {
+        console.error("Expected comments data to be an array but got:", typeof result.data);
+        setComments([]);
+        return;
+      }
+
+      const formattedComments = result.data.map((comment: any) => {
+        return {
+          id: comment.id?.toString() || "unknown",
+          username: comment.username || "Anonymous",
+          text: comment.content || "",
+          likes: comment.votes || 0,
+          timestamp: comment.created_at
+            ? new Date(comment.created_at).toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit',
+              })
+            : "Just now",
+        };
+      });
+
+      setComments(formattedComments);
+    } else {
+      console.log('No comments found or error:', result.error || "Unknown error");
+      setComments([]);
+    }
+  } catch (error) {
+    console.error('Error fetching comments:', error);
+    setComments([]);
+  } finally {
+    setIsLoadingComments(false);
+  }
+};
 
   const handleLikePost = async () => {
     if (!userId || !post) return;
@@ -174,7 +211,7 @@ export default function CommentsScreen() {
       setPost({ ...post, likes: newLikeCount });
 
       // Call API to update likes
-      const response = await fetch(`http://10.0.2.2:8080/post/${post.id}/vote`, {
+      const response = await fetch(`${ENV.API_URL}/post/${post.id}/vote`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -209,7 +246,7 @@ export default function CommentsScreen() {
       setComments(updatedComments);
 
       // Call API to update likes
-      const response = await fetch(`http://10.0.2.2:8080/comment/${commentId}/vote`, {
+      const response = await fetch(`${ENV.API_URL}/comment/${commentId}/vote`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -236,10 +273,10 @@ const handleAddComment = async () => {
   setIsSubmitting(true);
 
   try {
-    console.log("Submitting comment to:", `http://10.0.2.2:8080/posts/${postId}/comments`);
+    console.log("Submitting comment to:", `${ENV.API_URL}/posts/${postId}/comments`);
     console.log("Comment data:", { user_id: userId, content: commentText });
 
-    const response = await fetch(`http://10.0.2.2:8080/posts/${postId}/comments`, {
+    const response = await fetch(`${ENV.API_URL}/posts/${postId}/comments`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -324,6 +361,16 @@ const handleAddComment = async () => {
                 <ScrollView
                   contentContainerStyle={styles.scrollContent}
                   keyboardShouldPersistTaps="handled"
+                  refreshControl={
+                    <RefreshControl
+                      refreshing={refreshing}
+                      onRefresh={onRefresh}
+                      colors={[theme.colors.primary]}
+                      tintColor={theme.colors.primary}
+                      title="Pull to refresh"
+                      titleColor={theme.colors.text}
+                    />
+                  }
                 >
                   {post && (
                     <View>
@@ -340,6 +387,26 @@ const handleAddComment = async () => {
                         </View>
                         <View style={styles.bodyContainer}>
                           <Text style={styles.body}>{post.body}</Text>
+
+                          {/* Use EXACTLY the same image component as in topic.tsx */}
+                          {post.has_image && (
+                            <View style={styles.postImageContainer}>
+                              <Image
+                                source={{ uri: `${ENV.API_URL}/posts/${post.id}/image` }}
+                                style={styles.postImage}
+                                resizeMode="cover"
+                              />
+                            </View>
+                          )}
+
+                          {/* Use EXACTLY the same location component as in topic.tsx */}
+                          {post.location && (
+                            <View style={styles.locationContainer}>
+                              <Ionicons name="location" size={14} color="#0066FF" />
+                              <Text style={styles.locationText}>{post.location}</Text>
+                            </View>
+                          )}
+
                           <View style={styles.stats}>
                             <Text style={[styles.statText, styles.timestampText]}>
                               {post.timestamp}
@@ -358,6 +425,7 @@ const handleAddComment = async () => {
                         </View>
                       </View>
 
+                      {/* Rest of your content (Comment section header, comments list, etc.) */}
                       {/* Comment Section Header */}
                       <View style={styles.commentSectionHeader}>
                         <Text style={styles.commentSectionTitle}>Comments</Text>
@@ -605,10 +673,10 @@ const dynamicStyles = (theme: any) =>
       color: theme.colors.text,
     },
     bodyContainer: {
-      backgroundColor: theme.colors.card,
+      backgroundColor: '#E0F7FA',
       borderRadius: 10,
-      padding: 15,
-      minHeight: 80,
+      padding: 20,
+      minHeight: 100,
     },
     commentBodyContainer: {
       backgroundColor: theme.colors.card,
@@ -618,7 +686,7 @@ const dynamicStyles = (theme: any) =>
     },
     body: {
       fontSize: 14,
-      color: theme.colors.text,
+      color: '#000000',
       lineHeight: 20,
     },
     stats: {
@@ -657,43 +725,25 @@ const dynamicStyles = (theme: any) =>
       color: theme.colors.text + '80',
       fontStyle: 'italic',
     },
-    // inputWrapper: {
-    //   flex: 1,
-    //   marginRight: 10,
-    //   backgroundColor: theme.colors.card,
-    //   borderRadius: 25, // More rounded corners
-    //   paddingHorizontal: 15,
-    //   paddingVertical: 8,
-    //   shadowColor: '#000',
-    //   shadowOffset: { width: 0, height: 1 },
-    //   shadowOpacity: 0.1,
-    //   shadowRadius: 1,
-    //   elevation: 2,
-    // },
-    // input: {
-    //   fontSize: 14,
-    //   color: theme.colors.text,
-    //   maxHeight: 80,
-    //   minHeight: 36, // Ensure consistent height
-    //   paddingTop: 8, // Better text positioning
-    //   paddingBottom: 8,
-    // },
-    // sendButton: {
-    //   width: 40,
-    //   height: 40,
-    //   borderRadius: 20,
-    //   backgroundColor: theme.colors.primary,
-    //   justifyContent: 'center',
-    //   alignItems: 'center',
-    //   shadowColor: '#000',
-    //   shadowOffset: { width: 0, height: 2 },
-    //   shadowOpacity: 0.2,
-    //   shadowRadius: 2,
-    //   elevation: 3, // Add shadow on Android
-    // },
-    // sendButtonDisabled: {
-    //   backgroundColor: theme.colors.primary + '80',
-    //   shadowOpacity: 0.1, // Reduced shadow when disabled
-    //   elevation: 1,
-    // },
+    postImageContainer: {
+      marginTop: 10,
+      marginBottom: 10,
+    },
+    postImage: {
+      width: '100%',
+      height: 200,
+      borderRadius: 10,
+    },
+    locationContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 8,
+      marginBottom: 4,
+    },
+    locationText: {
+      fontSize: 12,
+      color: '#0066FF',
+      marginLeft: 4,
+      fontStyle: 'italic',
+    },
   });

@@ -14,6 +14,7 @@ import {
   Alert,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { ENV } from '@/utils/env';
 
 export default function Register() {
   const router = useRouter();
@@ -62,7 +63,7 @@ export default function Register() {
     // setIsLoading(true);
 
     try {
-      const response = await fetch("http://10.0.2.2:8080/register", {
+      const response = await fetch(`${ENV.API_URL}/register`, {
         method: "POST",
         headers: {
           'Content-Type': 'application/json',

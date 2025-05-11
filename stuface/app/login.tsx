@@ -19,6 +19,7 @@ import {
 import Inputs from "@/components/Inputs";
 import { useTheme } from "@/context/ThemeContex";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { ENV } from "@/utils/env";
 
 export default function Login() {
   const router = useRouter();
@@ -51,7 +52,7 @@ export default function Login() {
     }
 
     try {
-      const response = await fetch('http://10.0.2.2:8080/login', {
+      const response = await fetch(`${ENV.API_URL}/login`, {
         method: "POST",
         headers: {
           'Content-Type': 'application/json'

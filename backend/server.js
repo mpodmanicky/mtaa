@@ -10,7 +10,9 @@ const cors = require("cors");
 
 // Initialize Express app
 const app = express();
-app.use(express.json());
+app.use(express.json({limit: '50mb'}));
+app.use(express.urlencoded({ limit: '50mb', extended: true}));
+
 app.use(cors());
 
 // Create a database connection
@@ -569,10 +571,12 @@ function alterCommentsTable() {
   });
   pool.query(`
     ALTER TABLE posts
-    ADD COLUMN IF NOT EXISTS location TEXT
+    ADD COLUMN IF NOT EXISTS location TEXT;
+    ALTER TABLE posts
+    ADD COLUMN IF NOT EXISTS image_data BYTEA;
   `)
   .then(() => {
-    console.log('Added location column to posts table');
+    console.log('Added location, image_data column to posts table');
   })
   .catch(err => {
     console.error('Error adding location column to posts table:', err);
@@ -583,6 +587,257 @@ function alterCommentsTable() {
 setTimeout(() => {
   alterCommentsTable();
 }, 4000); // Run this after createTables which runs at 3000ms
+
+// Add these to your server.js file
+
+// Create device_tokens and notification_settings tables
+async function createNotificationTables() {
+  try {
+    // Create device_tokens table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS device_tokens (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        device_token TEXT NOT NULL,
+        platform TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, device_token)
+      );
+    `);
+
+    // Create notification_settings table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS notification_settings (
+        user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        enabled BOOLEAN DEFAULT TRUE,
+        chat_enabled BOOLEAN DEFAULT TRUE,
+        post_enabled BOOLEAN DEFAULT TRUE,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    console.log('Notification tables created successfully');
+  } catch (error) {
+    console.error('Error creating notification tables:', error);
+  }
+}
+
+// Call this function with a delay
+setTimeout(() => {
+  createNotificationTables();
+}, 5000);
+
+// Register device token for a user
+app.post('/users/:userId/device', async (req, res) => {
+  const userId = req.params.userId;
+  const { device_token, platform } = req.body;
+
+  if (!device_token || !platform) {
+    return res.status(400).json({ error: 'Device token and platform are required' });
+  }
+
+  try {
+    // Check if user exists
+    const user = await pool.query('SELECT id FROM users WHERE id = $1', [userId]);
+    if (user.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Insert or update device token
+    await pool.query(`
+      INSERT INTO device_tokens (user_id, device_token, platform)
+      VALUES ($1, $2, $3)
+      ON CONFLICT (user_id, device_token)
+      DO UPDATE SET updated_at = CURRENT_TIMESTAMP
+    `, [userId, device_token, platform]);
+
+    // Ensure user has notification settings
+    await pool.query(`
+      INSERT INTO notification_settings (user_id)
+      VALUES ($1)
+      ON CONFLICT (user_id) DO NOTHING
+    `, [userId]);
+
+    return res.status(200).json({ message: 'Device registered successfully' });
+  } catch (error) {
+    console.error('Error registering device token:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Update notification preferences
+app.put('/users/:userId/notifications', async (req, res) => {
+  const userId = req.params.userId;
+  const { enabled, chat_enabled, post_enabled, push_token } = req.body;
+
+  try {
+    // Check if user exists
+    const user = await pool.query('SELECT id FROM users WHERE id = $1', [userId]);
+    if (user.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Update notification settings
+    await pool.query(`
+      INSERT INTO notification_settings (user_id, enabled, chat_enabled, post_enabled, updated_at)
+      VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
+      ON CONFLICT (user_id)
+      DO UPDATE SET
+        enabled = $2,
+        chat_enabled = $3,
+        post_enabled = $4,
+        updated_at = CURRENT_TIMESTAMP
+    `, [userId, enabled, chat_enabled, post_enabled]);
+
+    // Update push token if provided
+    if (push_token) {
+      await pool.query(`
+        INSERT INTO device_tokens (user_id, device_token, platform, updated_at)
+        VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+        ON CONFLICT (user_id, device_token)
+        DO UPDATE SET updated_at = CURRENT_TIMESTAMP
+      `, [userId, push_token, 'unknown']);
+    }
+
+    return res.status(200).json({ message: 'Notification preferences updated successfully' });
+  } catch (error) {
+    console.error('Error updating notification preferences:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get notification settings for a user
+app.get('/users/:userId/notifications', async (req, res) => {
+  const userId = req.params.userId;
+
+  try {
+    // Check if user exists
+    const user = await pool.query('SELECT id FROM users WHERE id = $1', [userId]);
+    if (user.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Get notification settings
+    const result = await pool.query(`
+      SELECT * FROM notification_settings
+      WHERE user_id = $1
+    `, [userId]);
+
+    if (result.rows.length === 0) {
+      // Default settings if none exist
+      return res.status(200).json({
+        data: {
+          enabled: true,
+          chat_enabled: true,
+          post_enabled: true
+        }
+      });
+    }
+
+    return res.status(200).json({ data: result.rows[0] });
+  } catch (error) {
+    console.error('Error getting notification settings:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Helper function to send push notifications
+async function sendPushNotification(userId, title, body, data) {
+  try {
+    // Check if user has notifications enabled
+    const settings = await pool.query(`
+      SELECT * FROM notification_settings
+      WHERE user_id = $1
+    `, [userId]);
+
+    // Return if notifications are disabled
+    if (settings.rows.length === 0 || !settings.rows[0].enabled) {
+      return;
+    }
+
+    // Check if specific notification type is enabled
+    if (data.type === 'chat' && !settings.rows[0].chat_enabled) {
+      return;
+    }
+
+    if ((data.type === 'comment' || data.type === 'like') && !settings.rows[0].post_enabled) {
+      return;
+    }
+
+    // Get user's device tokens
+    const tokens = await pool.query(`
+      SELECT device_token FROM device_tokens
+      WHERE user_id = $1
+    `, [userId]);
+
+    if (tokens.rows.length === 0) {
+      return;
+    }
+
+    // Send to all devices
+    for (const row of tokens.rows) {
+      // Use any push notification service here
+      console.log(`Sending push notification to ${row.device_token}`);
+      console.log(`Title: ${title}, Body: ${body}, Data:`, data);
+
+      // Here you'd implement the actual sending logic with Expo or Firebase
+      // For now, we'll just log it
+    }
+  } catch (error) {
+    console.error('Error sending push notification:', error);
+  }
+}
+
+// Update post comment endpoint to send notifications
+const originalPostCommentEndpoint = app.post.bind(app, "/posts/:id/comments");
+
+app.post("/posts/:id/comments", async (req, res) => {
+  const postId = req.params.id;
+  const { user_id, content } = req.body;
+
+  try {
+    // Get post author to send notification
+    const postAuthor = await pool.query(`
+      SELECT p.user_id, p.has_image, p.location, t.id as topic_id, t.name as topic_name
+      FROM posts p
+      JOIN topics t ON p.topic_id = t.id
+      WHERE p.id = $1
+    `, [postId]);
+
+    // Get commenter username
+    const commenter = await pool.query(`
+      SELECT username FROM users WHERE id = $1
+    `, [user_id]);
+
+    // Call original endpoint handler
+    originalPostCommentEndpoint(req, res);
+
+    // Don't send notification if commenter is post author
+    if (postAuthor.rows.length > 0 &&
+        postAuthor.rows[0].user_id !== user_id &&
+        commenter.rows.length > 0) {
+
+      // Send notification to post author
+      sendPushNotification(
+        postAuthor.rows[0].user_id,
+        'New Comment',
+        `${commenter.rows[0].username} commented on your post`,
+        {
+          type: 'comment',
+          postId: postId,
+          hasImage: postAuthor.rows[0].has_image,
+          location: postAuthor.rows[0].location,
+          topicId: postAuthor.rows[0].topic_id,
+          topicName: postAuthor.rows[0].topic_name
+        }
+      );
+    }
+  } catch (error) {
+    console.error('Error in comment notification:', error);
+    // Original handler already called, so we don't need to respond here
+  }
+});
 
 //file upload
 //Method: POST
@@ -999,7 +1254,8 @@ app.get("/topics/:id/posts", async (req, res) => {
         p.location,
         p.created_at,
         u.username,
-        (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id) as comment_count
+        (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id) as comment_count,
+        CASE WHEN p.image_data IS NOT NULL THEN true ELSE false END as has_image
       FROM posts p
       JOIN users u ON p.user_id = u.id
       WHERE p.topic_id = $1
@@ -1071,11 +1327,11 @@ app.post("/post", async (req, res) => {
 });
 
 /**
- * @description Create a new post
+ * @description Create a new post with a base64 encoded image
  * @returns The newly created post
  */
 app.post("/posts", async (req, res) => {
-  const { user_id, topic_id, content, location } = req.body;
+  const { user_id, topic_id, content, location, image_data } = req.body;
 
   if (!user_id || !topic_id || !content) {
     return res.status(400).json({ error: "User ID, topic ID, and content are required" });
@@ -1093,30 +1349,38 @@ app.post("/posts", async (req, res) => {
       return res.status(404).json({ error: "Topic not found" });
     }
 
-    // Create the post
     let result;
-    if (location) {
-      // Insert with location
+
+    // Check if an image was provided
+    if (image_data) {
+      // Convert base64 to binary buffer
+      const imageBuffer = Buffer.from(image_data, 'base64');
+      console.log(`Received image of size ${imageBuffer.length} bytes`);
+
+      // Store the image binary data in the database
+      result = await pool.query(
+        `INSERT INTO posts (user_id, topic_id, content, location, image_data)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING id, content, created_at`,
+        [user_id, topic_id, content, location || null, imageBuffer]
+      );
+    } else {
+      // No image uploaded
       result = await pool.query(
         `INSERT INTO posts (user_id, topic_id, content, location)
          VALUES ($1, $2, $3, $4)
          RETURNING id, content, created_at`,
-        [user_id, topic_id, content, location]
-      );
-    } else {
-      // Insert without location
-      result = await pool.query(
-        `INSERT INTO posts (user_id, topic_id, content)
-         VALUES ($1, $2, $3)
-         RETURNING id, content, created_at`,
-        [user_id, topic_id, content]
+        [user_id, topic_id, content, location || null]
       );
     }
 
     // Return the new post
     return res.status(201).json({
       message: "Post created successfully",
-      data: result.rows[0]
+      data: {
+        ...result.rows[0],
+        has_image: image_data !== undefined
+      }
     });
   } catch (e) {
     console.error("Error creating post:", e);
@@ -1138,6 +1402,32 @@ app.get("/posts", async (req, res) => {
   } catch (e) {
     console.error("Something went wrong when loading posts...", e);
     return res.status(500).json({ error: "Internal server error!" });
+  }
+});
+
+/**
+ * @description Get image data for a post
+ * @returns Binary image data
+ */
+app.get("/posts/:id/image", async (req, res) => {
+  const postId = req.params.id;
+
+  try {
+    const result = await pool.query(
+      "SELECT image_data FROM posts WHERE id = $1 AND image_data IS NOT NULL",
+      [postId]
+    );
+
+    if (result.rows.length === 0 || !result.rows[0].image_data) {
+      return res.status(404).json({ error: "Image not found" });
+    }
+
+    // Set appropriate content type and return the binary data
+    res.set('Content-Type', 'image/jpeg');
+    res.send(result.rows[0].image_data);
+  } catch (e) {
+    console.error("Error fetching image:", e);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
@@ -1257,13 +1547,13 @@ app.get("/posts/:id", async (req, res) => {
         p.id,
         p.content,
         p.votes,
+        p.location,
         p.created_at,
         u.username,
-        t.name as topic_name,
-        (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id) as comment_count
+        (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id) as comment_count,
+        CASE WHEN p.image_data IS NOT NULL THEN true ELSE false END as has_image
       FROM posts p
       JOIN users u ON p.user_id = u.id
-      JOIN topics t ON p.topic_id = t.id
       WHERE p.id = $1
     `, [postId]);
 
