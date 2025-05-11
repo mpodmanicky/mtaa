@@ -26,6 +26,7 @@ interface Post {
   likes: number;
   comments: number;
   timestamp: string;
+  location?: string; // Add optional location field
 }
 
 export default function TopicScreen() {
@@ -72,14 +73,20 @@ export default function TopicScreen() {
 
       if (response.ok && result.data) {
         // Transform the data to match our Post interface
-        const formattedPosts = result.data.map((post: any) => ({
-          id: post.id.toString(),
-          username: post.username,
-          body: post.content,
-          likes: post.votes,
-          comments: post.comment_count || 0,
-          timestamp: new Date(post.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        }));
+        const formattedPosts = result.data.map((post: any) => {
+          return {
+            id: post.id.toString(),
+            username: post.username,
+            body: post.content,
+            likes: post.votes,
+            comments: post.comment_count || 0,
+            timestamp: new Date(post.created_at).toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit'
+            }),
+            location: post.location || undefined, // Map the location field
+          };
+        });
 
         setPosts(formattedPosts);
       } else {
@@ -218,6 +225,14 @@ export default function TopicScreen() {
                     </View>
                     <View style={styles.bodyContainer}>
                       <Text style={styles.body}>{post.body}</Text>
+
+                      {post.location && (
+                        <View style={styles.locationContainer}>
+                          <Ionicons name="location" size={14} color="#0066FF" />
+                          <Text style={styles.locationText}>{post.location}</Text>
+                        </View>
+                      )}
+
                       <View style={styles.stats}>
                         <Text style={[styles.statText, styles.timestampText]}>
                           {post.timestamp}
@@ -365,5 +380,17 @@ const dynamicStyles = (theme: any) =>
       fontSize: 16,
       color: theme.colors.text,
       opacity: 0.7,
+    },
+    locationContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 8,
+      marginBottom: 4,
+    },
+    locationText: {
+      fontSize: 12,
+      color: '#0066FF',
+      marginLeft: 4,
+      fontStyle: 'italic',
     },
   });
