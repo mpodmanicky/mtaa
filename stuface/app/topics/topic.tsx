@@ -205,6 +205,52 @@ export default function TopicScreen() {
     });
   };
 
+  // Function to handle post deletion
+  const handleDeletePost = async (postId: string) => {
+    if (!userId) return;
+
+    // Show confirmation dialog first
+    Alert.alert(
+      "Delete Post",
+      "Are you sure you want to delete this post? This action cannot be undone.",
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              // Show loading state
+              setIsLoading(true);
+
+              // Call the API to delete the post
+              const response = await fetch(`${ENV.API_URL}/post/${postId}`, {
+                method: 'DELETE',
+              });
+
+              if (response.ok) {
+                // Remove the post from local state
+                setPosts(prevPosts => prevPosts.filter(post => post.id !== postId));
+                Alert.alert("Success", "Post deleted successfully");
+              } else {
+                const errorData = await response.json();
+                Alert.alert("Error", errorData.error || "Failed to delete post");
+              }
+            } catch (error) {
+              console.error('Error deleting post:', error);
+              Alert.alert("Error", "Failed to delete post. Please try again.");
+            } finally {
+              setIsLoading(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
@@ -254,6 +300,16 @@ export default function TopicScreen() {
                         style={styles.airplaneIcon}
                       />
                       <Text style={styles.username}>{post.username}</Text>
+
+                      {/* Delete button - only visible for the current user's posts */}
+                      {post.username === currentUsername && (
+                        <TouchableOpacity
+                          style={styles.deleteButton}
+                          onPress={() => handleDeletePost(post.id)}
+                        >
+                          <Ionicons name="trash-outline" size={18} color="#FF3B30" />
+                        </TouchableOpacity>
+                      )}
                     </View>
                     <View style={styles.bodyContainer}>
                       <Text style={styles.body}>{post.body}</Text>
@@ -362,7 +418,8 @@ const dynamicStyles = (theme: any) =>
     },
     scrollContent: {
       padding: 15,
-      bottom: 60,
+      marginTop: 15,
+      bottom: 30,
     },
     postCard: {
       marginBottom: 15,
@@ -450,5 +507,9 @@ const dynamicStyles = (theme: any) =>
       width: '100%',
       height: 200,
       borderRadius: 10,
+    },
+    deleteButton: {
+      marginLeft: 'auto',
+      padding: 5,
     },
   });

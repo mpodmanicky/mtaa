@@ -63,10 +63,16 @@ export default function SettingsScreen() {
 
             <TouchableOpacity
               style={styles.settingItem}
-              onPress={() => {/* Handle Change Password */}}
+              onPress={() => {
+                router.push({pathname: '/password'});
+              }}
             >
               <Text style={styles.settingText}>Change Password</Text>
-              <Ionicons name="chevron-forward" size={20} color={theme.colors.text} />
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color={theme.colors.text}
+              />
             </TouchableOpacity>
           </View>
 
