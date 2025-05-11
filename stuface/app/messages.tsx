@@ -57,8 +57,7 @@ export default function MessagesScreen() {
     if (!userId || !conversationId) return;
 
     // Connect to WebSocket server with proper URL
-    // (update with your actual server address when running on a device)
-    const wsUrl = `ws://127.0.0.1:8080/chat?userId=${userId}`;
+    const wsUrl = `ws://10.0.2.2:8080/chat?userId=${userId}`;
     ws.current = new WebSocket(wsUrl);
 
     ws.current.onopen = () => {
@@ -116,7 +115,7 @@ export default function MessagesScreen() {
 
     try {
       const response = await fetch(
-        `http://127.0.0.1:8080/conversations/${conversationId}/messages/${userId}`
+        `http://10.0.2.2:8080/conversations/${conversationId}/messages/${userId}`
       );
       const result = await response.json();
 
@@ -236,11 +235,11 @@ export default function MessagesScreen() {
             {/* Message input area */}
             <View style={styles.inputContainer}>
               <View style={styles.inputWrapper}>
-                <Inputs placeholder="Type a message..." isPassword={false} />
+                <Inputs placeholder="Type a message..." isPassword={false} value={messageText} onChangeText={setMessageText} />
               </View>
               <TouchableOpacity
                 style={styles.sendButton}
-                onPress={sendMessage}
+                onPress={() => sendMessage()}
                 disabled={!messageText.trim()}
               >
                 <Ionicons

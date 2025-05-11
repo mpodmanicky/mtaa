@@ -43,43 +43,64 @@ export default function Login() {
   }
 
   async function login() {
-    // first set username and password // this can later be removed now just for development
-    if(password !== "" && username !== "") {
-      // testing
-      saveLoginData({ username: username, password: password });
-      updateUsername(username);
-      return router.push({
-        pathname: "/home",
-      })
+    console.log("Attempting login with:", username, password);
+
+    if (!username || !password) {
+      Alert.alert("Error", "Please enter both username and password", [{ text: "OK" }]);
+      return;
     }
 
-    fetch('http://localhost:8080/login', {
-      method: "POST",
-      body: JSON.stringify({ username: username, password: password }),
-    })
-    .then((response) => {
-      if(response.status === 200) {
-        return response.json()
-      } else {
-        Alert.alert("Error", "Invalid username or password", [{text: "OK"}])
-      }
-    })
-    .then((data) => {
-      console.log(data);
-      if(data.message) {
-        saveLoginData(data)
-        updateUsername(data.username);
+    try {
+      const response = await fetch('http://10.0.2.2:8080/login', {
+        method: "POST",
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          username: username,
+          password: password
+        }),
+      });
+
+      console.log("Login response status:", response.status);
+
+      // Parse the response JSON
+      const data = await response.json();
+      console.log("Login response data:", data);
+
+      if (response.ok) {
+        // Login successful
+        console.log("Login successful:", data);
+
+        // Save user data in AsyncStorage
+        await saveLoginData({username: username, password: password});
+        await updateUsername(username);
+
+        // Save userId if it exists in the response
+        if (data.userId) {
+          await AsyncStorage.setItem("userId", data.userId.toString());
+        }
+
+        // Navigate to home
         router.push({
           pathname: "/home",
         });
       } else {
-        Alert.alert("Error", data.error, [{text: "OK"}])
+        // Login failed with error from server
+        Alert.alert(
+          "Login Failed",
+          data.error || "Invalid username or password",
+          [{ text: "OK" }]
+        );
       }
-    })
-    .catch((e) => {
-      console.log(e);
-      Alert.alert("Error", "Connection error", [{text: "OK"}])
-    })
+    } catch (error) {
+      console.error("Login network error:", error);
+      Alert.alert(
+        "Connection Error",
+        "Could not connect to the server. Please check your internet connection and server status.",
+        [{ text: "OK" }]
+      );
+    }
   }
 
   return (

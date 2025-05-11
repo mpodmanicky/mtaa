@@ -44,30 +44,81 @@ export default function Register() {
   }
 
   async function register() {
-    fetch("http://localhost:8080/register", {
-      method: "POST",
-      body: JSON.stringify({
-        username: name,
-        email: email,
-        password: password,
-        password2: repeatPassword,
-      })
-    })
-    .then(response => {
-      response.json();
-    })
-    .then((data: any) => {
-      console.log(data);
-      if (data.message) {
-        saveLoginData({ username: name, password: password });
-        updateUsername(name);
-        router.push({
-          pathname: "/home",
-        });
+    console.log("Registering user: ", username, name, lastname, email, password, repeatPassword);
+
+    // Add validation for email domain
+    if (!email.toLowerCase().endsWith('@stuba.sk')) {
+      Alert.alert("Error", "Only @stuba.sk email addresses are allowed", [{ text: "OK" }]);
+      return;
+    }
+
+    // Add validation for password match
+    if (password !== repeatPassword) {
+      Alert.alert("Error", "Passwords do not match", [{ text: "OK" }]);
+      return;
+    }
+
+    // Show loading indicator (optional)
+    // setIsLoading(true);
+
+    try {
+      const response = await fetch("http://10.0.2.2:8080/register", {
+        method: "POST",
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username,
+          name,
+          lastname,
+          email,
+          password,
+          password2: repeatPassword,
+        })
+      });
+
+      // Parse the JSON response
+      const data = await response.json();
+
+      // Log the full response for debugging
+      console.log("Register response:", response.status, data);
+
+      if (response.ok) {
+        // Registration successful
+        console.log("Registration successful:", data);
+
+        // Save login data
+        await saveLoginData({ username, password });
+        await updateUsername(username);
+
+        // Show success message
+        Alert.alert(
+          "Registration Successful",
+          "Your account has been created successfully!",
+          [
+            {
+              text: "Continue",
+              onPress: () => {
+                router.push({
+                  pathname: "/home",
+                });
+              }
+            }
+          ]
+        );
       } else {
-        Alert.alert("Error", data.error, [{ text: "OK" }]); // or error i dont remember
+        // Registration failed with error from server
+        Alert.alert("Registration Failed", data.error || "Unknown error occurred", [{ text: "OK" }]);
       }
-    })
+    } catch (error) {
+      // Network or other error
+      console.error("Registration error:", error);
+      Alert.alert(
+        "Connection Error",
+        "Could not connect to the server. Please check your internet connection.",
+        [{ text: "OK" }]
+      );
+    }
   }
 
   return (
