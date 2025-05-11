@@ -1,27 +1,14 @@
 import { ThemeProvider } from "@/context/ThemeContex";
-import React, { useEffect, useState, useRef, useCallback } from "react";
-import { Platform, StatusBar } from "react-native";
-import { Stack, Tabs, usePathname, useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
+import { Platform, StatusBar, View } from "react-native";
+import { Stack, Tabs, usePathname } from "expo-router";
 import CustomTabBar from "@/components/CustomTabBar";
-import { ENV } from "@/utils/env";
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { registerForPushNotificationsAsync, setupNotificationListeners } from "@/utils/notifications";
+import { ENV } from "@/utils/env"; // Import our environment configuration
 
 export default function RootLayout() {
   const pathname = usePathname();
-  const router = useRouter();
   const isAuthScreen = pathname === '/login' || pathname === '/register' || pathname === '/';
   const [isConfigLoaded, setIsConfigLoaded] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const cleanupListenersRef = useRef<() => void>();
-
-  // Navigation callback for notifications
-  const handleNotificationNavigation = useCallback((navInfo: { screen: string, params: any }) => {
-    router.push({
-      pathname: navInfo.screen,
-      params: navInfo.params
-    });
-  }, [router]);
 
   useEffect(() => {
     // Configure platform-specific settings
@@ -31,37 +18,8 @@ export default function RootLayout() {
       StatusBar.setBackgroundColor("transparent");
     }
 
-    // Check authentication status and initialize notifications
-    const initializeApp = async () => {
-      const userId = await AsyncStorage.getItem('userId');
-      const isLoggedIn = !!userId;
-      setIsAuthenticated(isLoggedIn);
-
-      if (isLoggedIn) {
-        // Register for push notifications if user is logged in
-        await registerForPushNotificationsAsync();
-      }
-
-      setIsConfigLoaded(true);
-    };
-
-    initializeApp();
+    setIsConfigLoaded(true);
   }, []);
-
-  // Setup notification listeners when authenticated
-  useEffect(() => {
-    if (isAuthenticated && !isAuthScreen) {
-      // Setup notification listeners and store cleanup function
-      cleanupListenersRef.current = setupNotificationListeners(handleNotificationNavigation);
-
-      // Clean up listeners when component unmounts or auth status changes
-      return () => {
-        if (cleanupListenersRef.current) {
-          cleanupListenersRef.current();
-        }
-      };
-    }
-  }, [isAuthenticated, isAuthScreen, handleNotificationNavigation]);
 
   // Don't render anything until config is loaded
   if (!isConfigLoaded) {
