@@ -313,6 +313,70 @@ async function getMessagesForConversation(conversationId, userId) {
 // ===========================================
 
 /**
+ * @description Check if a conversation exists between two users
+ * @returns Conversation data if it exists
+ */
+app.get('/conversations/check', async (req, res) => {
+  const { user1, user2 } = req.query;
+
+  if (!user1 || !user2) {
+    return res.status(400).json({ error: 'Both user IDs are required' });
+  }
+
+  try {
+    // Get all conversations for user1
+    const user1Conversations = await pool.query(
+      `SELECT c.id FROM conversations c
+       JOIN conversation_participants cp ON c.id = cp.conversation_id
+       WHERE cp.user_id = $1`,
+      [user1]
+    );
+
+    if (user1Conversations.rows.length === 0) {
+      return res.status(200).json({ exists: false });
+    }
+
+    // Check if any of these conversations also include user2
+    const conversationIds = user1Conversations.rows.map(row => row.id);
+
+    const sharedConversation = await pool.query(
+      `SELECT c.id FROM conversations c
+       JOIN conversation_participants cp ON c.id = cp.conversation_id
+       WHERE cp.user_id = $1 AND cp.conversation_id = ANY($2)`,
+      [user2, conversationIds]
+    );
+
+    if (sharedConversation.rows.length > 0) {
+      // Get the conversation details
+      const conversationId = sharedConversation.rows[0].id;
+
+      const conversationDetails = await pool.query(
+        `SELECT c.id, c.created_at,
+          (SELECT m.content FROM messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC LIMIT 1) as last_message,
+          (SELECT m.created_at FROM messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC LIMIT 1) as last_message_time,
+          array_agg(u.username) as participants
+         FROM conversations c
+         JOIN conversation_participants cp ON c.id = cp.conversation_id
+         JOIN users u ON cp.user_id = u.id
+         WHERE c.id = $1
+         GROUP BY c.id, c.created_at`,
+        [conversationId]
+      );
+
+      return res.status(200).json({
+        exists: true,
+        data: conversationDetails.rows[0]
+      });
+    }
+
+    return res.status(200).json({ exists: false });
+  } catch (error) {
+    console.error('Error checking for conversation:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * @description Get conversation list for a user
  * @returns List of conversations with latest message
  */
@@ -490,6 +554,35 @@ function createTables() {
 setTimeout(() => {
   createTables();
 }, 3000);
+
+// Add this function to alter the comments table to add the votes column
+function alterCommentsTable() {
+  pool.query(`
+    ALTER TABLE comments
+    ADD COLUMN IF NOT EXISTS votes INTEGER DEFAULT 0
+  `)
+  .then(() => {
+    console.log('Added votes column to comments table');
+  })
+  .catch(err => {
+    console.error('Error adding votes column to comments table:', err);
+  });
+  pool.query(`
+    ALTER TABLE posts
+    ADD COLUMN IF NOT EXISTS location TEXT
+  `)
+  .then(() => {
+    console.log('Added location column to posts table');
+  })
+  .catch(err => {
+    console.error('Error adding location column to posts table:', err);
+  });
+}
+
+// Call this function after your createTables function
+setTimeout(() => {
+  alterCommentsTable();
+}, 4000); // Run this after createTables which runs at 3000ms
 
 //file upload
 //Method: POST
@@ -726,7 +819,7 @@ app.post("/register", async (req, res) => {
         );
         return res
           .status(200)
-          .json({ message: "User registered successfully" });
+          .json({ message: "User registered successfully", username: user.username, password: user.password });
       } else {
         return res.status(400).json({ error: "Passwords do not match" });
       }
@@ -759,7 +852,7 @@ app.post("/login", async (req, res) => {
       if (user.password === existing_user.rows[0].password) {
         return res
           .status(200)
-          .json({ message: "User logged in successfully!" });
+          .json({ message: "User logged in successfully!", username: user.username, password: user.password, userId: existing_user.rows[0].id });
       } else {
         return res.status(400).json({ error: "Incorrect password!" });
       }
@@ -890,6 +983,47 @@ app.get("/topics/:id", async (req, res) => {
 });
 
 /**
+ * @description Get posts for a specific topic
+ * @returns All posts for the topic
+ */
+app.get("/topics/:id/posts", async (req, res) => {
+  const topicId = req.params.id;
+
+  try {
+    // Get posts with username, comment count, and location
+    const result = await pool.query(`
+      SELECT
+        p.id,
+        p.content,
+        p.votes,
+        p.location,
+        p.created_at,
+        u.username,
+        (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id) as comment_count
+      FROM posts p
+      JOIN users u ON p.user_id = u.id
+      WHERE p.topic_id = $1
+      ORDER BY p.created_at DESC
+    `, [topicId]);
+
+    if (result.rows.length === 0) {
+      return res.status(200).json({
+        message: "No posts found for this topic",
+        data: []
+      });
+    } else {
+      return res.status(200).json({
+        message: "Posts retrieved successfully",
+        data: result.rows
+      });
+    }
+  } catch (e) {
+    console.error("Error loading posts for topic:", e);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+/**
  * @returns All topics
  * User can see all topics
  * He can filter them by name, owner, visibility
@@ -933,6 +1067,60 @@ app.post("/post", async (req, res) => {
   } catch (e) {
     console.error("Something went wrong when creating post...", e);
     return res.status(500).json({ error: "Internal server error!" });
+  }
+});
+
+/**
+ * @description Create a new post
+ * @returns The newly created post
+ */
+app.post("/posts", async (req, res) => {
+  const { user_id, topic_id, content, location } = req.body;
+
+  if (!user_id || !topic_id || !content) {
+    return res.status(400).json({ error: "User ID, topic ID, and content are required" });
+  }
+
+  try {
+    // Check if user and topic exist
+    const userExists = await pool.query("SELECT id FROM users WHERE id = $1", [user_id]);
+    if (userExists.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const topicExists = await pool.query("SELECT id FROM topics WHERE id = $1", [topic_id]);
+    if (topicExists.rows.length === 0) {
+      return res.status(404).json({ error: "Topic not found" });
+    }
+
+    // Create the post
+    let result;
+    if (location) {
+      // Insert with location
+      result = await pool.query(
+        `INSERT INTO posts (user_id, topic_id, content, location)
+         VALUES ($1, $2, $3, $4)
+         RETURNING id, content, created_at`,
+        [user_id, topic_id, content, location]
+      );
+    } else {
+      // Insert without location
+      result = await pool.query(
+        `INSERT INTO posts (user_id, topic_id, content)
+         VALUES ($1, $2, $3)
+         RETURNING id, content, created_at`,
+        [user_id, topic_id, content]
+      );
+    }
+
+    // Return the new post
+    return res.status(201).json({
+      message: "Post created successfully",
+      data: result.rows[0]
+    });
+  } catch (e) {
+    console.error("Error creating post:", e);
+    return res.status(500).json({ error: "Internal server error" });
   }
 });
 
@@ -1056,8 +1244,150 @@ app.put("/post/:id/vote", async (req, res) => {
   }
 });
 
-// Import chat functions from WebSocket server
-const { getConversationsForUser, getMessagesForConversation } = require('./wsServer');
+/**
+ * @description Get detailed information for a single post
+ * @returns Post data including comment count
+ */
+app.get("/posts/:id", async (req, res) => {
+  const postId = req.params.id;
+
+  try {
+    const result = await pool.query(`
+      SELECT
+        p.id,
+        p.content,
+        p.votes,
+        p.created_at,
+        u.username,
+        t.name as topic_name,
+        (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id) as comment_count
+      FROM posts p
+      JOIN users u ON p.user_id = u.id
+      JOIN topics t ON p.topic_id = t.id
+      WHERE p.id = $1
+    `, [postId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Post not found" });
+    } else {
+      return res.status(200).json({
+        message: "Post retrieved successfully",
+        data: result.rows[0]
+      });
+    }
+  } catch (e) {
+    console.error("Error loading post:", e);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+/**
+ * @description Get comments for a specific post
+ * @returns List of comments with usernames
+ */
+app.get("/posts/:id/comments", async (req, res) => {
+  const postId = req.params.id;
+
+  try {
+    const result = await pool.query(`
+      SELECT
+        c.id,
+        c.content,
+        c.votes,
+        c.created_at,
+        u.username
+      FROM comments c
+      JOIN users u ON c.user_id = u.id
+      WHERE c.post_id = $1
+      ORDER BY c.created_at DESC
+    `, [postId]);
+
+    return res.status(200).json({
+      message: "Comments retrieved successfully",
+      data: result.rows
+    });
+  } catch (e) {
+    console.error("Error loading comments:", e);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+/**
+ * @description Add a new comment to a post
+ * @returns The newly created comment
+ */
+app.post("/posts/:id/comments", async (req, res) => {
+  const postId = req.params.id;
+  const { user_id, content } = req.body;
+
+  if (!user_id || !content) {
+    return res.status(400).json({ error: "User ID and content are required" });
+  }
+
+  try {
+    // Check if post exists
+    const postCheck = await pool.query("SELECT id FROM posts WHERE id = $1", [postId]);
+    if (postCheck.rows.length === 0) {
+      return res.status(404).json({ error: "Post not found" });
+    }
+
+    // Create the comment
+    const result = await pool.query(
+      `INSERT INTO comments (post_id, user_id, content)
+       VALUES ($1, $2, $3)
+       RETURNING id, content, created_at`,
+      [postId, user_id, content]
+    );
+
+    // Get username for the response
+    const userQuery = await pool.query("SELECT username FROM users WHERE id = $1", [user_id]);
+    const username = userQuery.rows[0].username;
+
+    // Return the new comment with username
+    return res.status(201).json({
+      message: "Comment added successfully",
+      data: {
+        ...result.rows[0],
+        username,
+        votes: 0
+      }
+    });
+  } catch (e) {
+    console.error("Error adding comment:", e);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+/**
+ * @description Vote on a comment
+ * @returns Status code 200 with a success message if the vote is updated
+ * @params request body containing vote value (+1 or -1)
+ */
+app.put("/comment/:id/vote", async (req, res) => {
+  const commentId = req.params.id;
+  const { vote } = req.body; // Expecting a vote value of either +1 or -1
+
+  if (vote !== 1 && vote !== -1) {
+    return res.status(400).json({ error: "Vote must be either 1 or -1" });
+  }
+
+  try {
+    const comment = await pool.query("SELECT * FROM comments WHERE id = $1", [commentId]);
+    if (comment.rows.length === 0) {
+      return res.status(404).json({ error: "Comment not found!" });
+    } else {
+      await pool.query(
+        "UPDATE comments SET votes = votes + $1 WHERE id = $2",
+        [vote, commentId]
+      );
+
+      return res.status(200).json({ message: "Vote updated successfully" });
+    }
+  } catch (e) {
+    console.error("Error updating comment vote:", e);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
 
 /**
  * @description Get conversation list for a user
