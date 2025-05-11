@@ -22,6 +22,8 @@ import { Stack } from 'expo-router';
 import * as Location from 'expo-location';
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
+import { Picker } from '@react-native-picker/picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useTheme } from '@/context/ThemeContex';
 
@@ -44,6 +46,109 @@ export default function CreateScreen() {
 
   // Create a ref for the camera
   const cameraRef = useRef<any>(null);
+
+  // Add state for topics and user ID
+  const [topics, setTopics] = useState([]);
+  const [selectedTopicId, setSelectedTopicId] = useState('');
+  const [userId, setUserId] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Get user ID on component mount
+  useEffect(() => {
+    const getUserId = async () => {
+      const storedUserId = await AsyncStorage.getItem('userId');
+      setUserId(storedUserId);
+    };
+
+    getUserId();
+  }, []);
+
+  // Fetch available topics on component mount
+  useEffect(() => {
+    fetchTopics();
+  }, []);
+
+  // Function to fetch topics from the backend
+  const fetchTopics = async () => {
+    try {
+      const response = await fetch('http://10.0.2.2:8080/topics');
+      const result = await response.json();
+
+      if (response.ok && result.data) {
+        setTopics(result.data);
+        // Set default selected topic to the first one if available
+        if (result.data.length > 0) {
+          setSelectedTopicId(result.data[0].id.toString());
+        }
+      } else {
+        console.error('Error fetching topics:', result.error);
+        Alert.alert('Error', 'Could not load topics. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error fetching topics:', error);
+      Alert.alert('Error', 'Could not connect to the server.');
+    }
+  };
+
+  // Function to handle post submission
+  const handlePostSubmission = async () => {
+    if (!postText.trim()) {
+      Alert.alert('Error', 'Please enter some text for your post.');
+      return;
+    }
+
+    if (!selectedTopicId) {
+      Alert.alert('Error', 'Please select a topic for your post.');
+      return;
+    }
+
+    if (!userId) {
+      Alert.alert('Error', 'You must be logged in to create a post.');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Prepare post data
+      const postData = {
+        user_id: userId,
+        topic_id: selectedTopicId,
+        content: postText,
+        location: placeName || null,
+        // Handle image separately if needed
+      };
+
+      console.log('Submitting post data:', postData);
+
+      // Send post data to server
+      const response = await fetch('http://10.0.2.2:8080/posts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(postData),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        Alert.alert('Success', 'Post created successfully!');
+        // Reset form
+        setPostText('');
+        setCapturedImage(null);
+        setPlaceName(null);
+        setLocation(null);
+      } else {
+        Alert.alert('Error', result.error || 'Failed to create post.');
+      }
+    } catch (error) {
+      console.error('Error creating post:', error);
+      Alert.alert('Error', 'Could not connect to the server.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   // Location function
   async function getCurrentLocation() {
@@ -144,14 +249,6 @@ export default function CreateScreen() {
     }
   };
 
-  const categories = [
-    { label: 'General', value: 'general' },
-    { label: 'Dormitory', value: 'dormitory' },
-    { label: 'Canteen', value: 'canteen' },
-    { label: 'Library', value: 'library' },
-    { label: 'University', value: 'university' },
-  ];
-
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
@@ -233,23 +330,35 @@ export default function CreateScreen() {
               {/* Post button */}
               <View style={styles.buttonContainer}>
                 <Buttons
-                  title="Post"
-                  onPress={() => {
-                    console.log('Post content:', postText);
-                    console.log('Location:', placeName);
-                    console.log('Category:', selectedCategory);
-                    console.log('Image:', capturedImage);
-                    // Implement post submission here
-                  }}
+                  title={isSubmitting ? "Posting..." : "Post"}
+                  onPress={handlePostSubmission}
                 />
               </View>
             </View>
 
             {/* Category Selection */}
             <View style={styles.pickerContainer}>
-              <Text style={styles.pickerLabel}>Select Category:</Text>
+              <Text style={styles.pickerLabel}>Select Topic:</Text>
               <View style={styles.pickerWrapper}>
-                <Text>Here will be a picker</Text>
+                {topics.length > 0 ? (
+                  <Picker
+                    selectedValue={selectedTopicId}
+                    onValueChange={(itemValue) => setSelectedTopicId(itemValue)}
+                    style={styles.picker}
+                    dropdownIconColor={theme.colors.text}
+                  >
+                    {topics.map((topic) => (
+                      <Picker.Item
+                        key={topic.id}
+                        label={topic.name}
+                        value={topic.id.toString()}
+                        color={theme.colors.text}
+                      />
+                    ))}
+                  </Picker>
+                ) : (
+                  <Text style={styles.loadingText}>Loading topics...</Text>
+                )}
               </View>
             </View>
           </ScrollView>
@@ -357,7 +466,15 @@ const dynamicStyles = (theme: any) =>
       borderRadius: 8,
       overflow: 'hidden',
       backgroundColor: theme.colors.card || '#f9f9f9',
-      padding: 10,
+    },
+    picker: {
+      width: '100%',
+      height: 50,
+      color: theme.colors.text,
+    },
+    loadingText: {
+      padding: 15,
+      color: theme.colors.text,
     },
     // Camera styles
     cameraContainer: {
