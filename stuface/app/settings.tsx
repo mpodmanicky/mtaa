@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,25 +16,42 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function SettingsScreen() {
-  const { theme, toggleTheme } = useTheme();
+  const { theme, toggleTheme, toggleHighContrast, isHighContrast } = useTheme();
   const router = useRouter();
   const styles = dynamicStyles(theme);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [username, setUsername] = useState('John Doe'); // Example username
 
-  // load username from AsyncStorage
-  async function loadUsername() {
-    try {
-      const value = await AsyncStorage.getItem('username');
-      if (value !== null) {
-        setUsername(value);
-      } else {
-        setUsername('John Doe'); // Default value if not found
+  // Load settings on component mount
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        // Load username
+        const value = await AsyncStorage.getItem('username');
+        if (value !== null) {
+          setUsername(value);
+        }
+
+        // Load notification settings
+        const notificationSetting = await AsyncStorage.getItem('notificationsEnabled');
+        setNotificationsEnabled(notificationSetting !== 'false');
+      } catch (e) {
+        console.log('Error loading settings:', e);
       }
+    };
+
+    loadSettings();
+  }, []);
+
+  // Handle notification toggle
+  const handleNotificationsToggle = async (value: boolean) => {
+    setNotificationsEnabled(value);
+    try {
+      await AsyncStorage.setItem('notificationsEnabled', value ? 'true' : 'false');
     } catch (e) {
-      console.log(e);
+      console.log('Error saving notification setting:', e);
     }
-  }
+  };
 
   return (
     <ImageBackground
@@ -86,7 +103,7 @@ export default function SettingsScreen() {
                 trackColor={{ false: "#767577", true: "#81b0ff" }}
                 thumbColor={notificationsEnabled ? "#f5dd4b" : "#f4f3f4"}
                 ios_backgroundColor="#3e3e3e"
-                onValueChange={() => setNotificationsEnabled(!notificationsEnabled)}
+                onValueChange={handleNotificationsToggle}
                 value={notificationsEnabled}
               />
             </View>
@@ -101,6 +118,30 @@ export default function SettingsScreen() {
                 value={theme.dark}
               />
             </View>
+          </View>
+
+          {/* Accessibility Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionHeader}>Accessibility</Text>
+
+            <View style={styles.settingItem}>
+              <Text style={styles.settingText}>High Contrast</Text>
+              <Switch
+                trackColor={{ false: "#767577", true: "#81b0ff" }}
+                thumbColor={isHighContrast ? "#f5dd4b" : "#f4f3f4"}
+                ios_backgroundColor="#3e3e3e"
+                onValueChange={toggleHighContrast}
+                value={isHighContrast}
+              />
+            </View>
+
+            {isHighContrast && (
+              <View style={styles.infoBox}>
+                <Text style={styles.infoText}>
+                  High contrast mode increases readability by using colors with greater contrast.
+                </Text>
+              </View>
+            )}
           </View>
 
           {/* Support Section */}
@@ -169,7 +210,7 @@ const dynamicStyles = (theme: any) => StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#5182FF",
+    backgroundColor: theme.colors.back,
     justifyContent: "center",
     alignItems: "center",
     shadowColor: "black",
@@ -209,7 +250,19 @@ const dynamicStyles = (theme: any) => StyleSheet.create({
     marginTop: 40,
   },
   versionText: {
-    color: theme.colors.muted || '#888',
+    color: theme.colors.text,
+    opacity: 0.6,
+    fontSize: 14,
+  },
+  infoBox: {
+    backgroundColor: theme.highContrast ? theme.colors.secondary : 'rgba(100, 100, 100, 0.2)',
+    borderRadius: 8,
+    padding: 12,
+    margin: 15,
+    marginTop: 0,
+  },
+  infoText: {
+    color: theme.colors.text,
     fontSize: 14,
   },
 });
