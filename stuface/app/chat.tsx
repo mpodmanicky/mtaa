@@ -26,23 +26,27 @@ export default function ChatScreen() {
   const styles = dynamicStyles(theme);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
+  const [username, setUsername] = useState<string | null>(null);
 
-  const navigateToMessages = (conversationId: string, username: string) => {
+  const navigateToMessages = (conversationId: string, displayName: string) => {
     router.push({
       pathname: '/messages',
       params: {
         conversationId: conversationId,
-        username: username
+        username: displayName
       }
-    })
-  }
+    });
+  };
 
   // Load user data and conversations
   useEffect(() => {
     const loadData = async () => {
       try {
         const storedUserId = await AsyncStorage.getItem('userId');
+        const storedUsername = await AsyncStorage.getItem('username');
+
         setUserId(storedUserId);
+        setUsername(storedUsername);
 
         if (storedUserId) {
           fetchConversations(storedUserId);
@@ -58,11 +62,15 @@ export default function ChatScreen() {
   // Fetch conversations function
   const fetchConversations = async (userId: string) => {
     try {
-      const response = await fetch(`http://127.0.0.1:8080/conversations/${userId}`);
+      const response = await fetch(`http://10.0.2.2:8080/conversations/${userId}`);
       const result = await response.json();
+
+      console.log('Conversations response:', result);
 
       if (response.ok && result.data) {
         setConversations(result.data);
+      } else {
+        console.log('No conversations found or server returned an error');
       }
     } catch (error) {
       console.error('Error fetching conversations:', error);
@@ -84,32 +92,29 @@ export default function ChatScreen() {
             conversations.map(conversation => {
               // For display purposes, filter out the current user from participants
               const otherParticipants = conversation.participants.filter(
-                name => name !== userId
+                participant => participant !== username
               );
               const displayName = otherParticipants.join(', ');
+
+              // Format the timestamp or use a placeholder
+              const timeDisplay = conversation.last_message_time
+                ? new Date(conversation.last_message_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                : 'N/A';
 
               return (
                 <ChatPill
                   key={conversation.id}
                   username={displayName}
                   lastMessage={conversation.last_message || 'No messages yet'}
-                  time={new Date(conversation.last_message_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  time={timeDisplay}
                   avatar={require('@/assets/images/react-logo.png')}
-                  unread={false} // can implement unread message tracking later
+                  unread={false}
                   onPress={() => navigateToMessages(conversation.id, displayName)}
                 />
               );
             })
           ) : (
-            //  existing fallback ChatPill for when no conversations exist
-            <ChatPill
-              username="John Doe"
-              lastMessage="Hey, how are you?"
-              time="10:30 AM"
-              avatar={require('@/assets/images/react-logo.png')}
-              unread={true}
-              onPress={() => navigateToMessages('1', 'John Doe')}
-            />
+            <Text style={styles.emptyText}>No conversations yet</Text>
           )}
         </ScrollView>
       </SafeAreaView>
@@ -141,5 +146,12 @@ const dynamicStyles = (theme: any) =>
     scrollContent: {
       paddingHorizontal: 10,
       paddingBottom: 20,
+    },
+    emptyText: {
+      textAlign: 'center',
+      marginTop: 50,
+      fontSize: 16,
+      color: theme.colors.text,
+      opacity: 0.7,
     },
   });
