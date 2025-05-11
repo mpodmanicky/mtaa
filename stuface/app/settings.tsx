@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -9,129 +9,32 @@ import {
   StatusBar,
   TouchableOpacity,
   Switch,
-  Alert,
 } from 'react-native';
 import { useTheme } from '@/context/ThemeContex';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { registerForPushNotificationsAsync } from '@/utils/notifications';
-import { ENV } from '@/utils/env';
 
 export default function SettingsScreen() {
   const { theme, toggleTheme } = useTheme();
   const router = useRouter();
   const styles = dynamicStyles(theme);
-
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [chatNotificationsEnabled, setChatNotificationsEnabled] = useState(true);
-  const [postNotificationsEnabled, setPostNotificationsEnabled] = useState(true);
-  const [username, setUsername] = useState('John Doe');
-  const [userId, setUserId] = useState<string | null>(null);
-  const [pushToken, setPushToken] = useState<string | null>(null);
+  const [username, setUsername] = useState('John Doe'); // Example username
 
-  // Load user data and notification preferences
-  useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        // Load username and userId
-        const storedUsername = await AsyncStorage.getItem('username');
-        const storedUserId = await AsyncStorage.getItem('userId');
-        const storedPushToken = await AsyncStorage.getItem('pushToken');
-
-        // Load notification preferences
-        const storedNotificationsEnabled = await AsyncStorage.getItem('notificationsEnabled');
-        const storedChatNotificationsEnabled = await AsyncStorage.getItem('chatNotificationsEnabled');
-        const storedPostNotificationsEnabled = await AsyncStorage.getItem('postNotificationsEnabled');
-
-        if (storedUsername) setUsername(storedUsername);
-        if (storedUserId) setUserId(storedUserId);
-        if (storedPushToken) setPushToken(storedPushToken);
-
-        // Set notification preferences with fallback to true if not found
-        setNotificationsEnabled(storedNotificationsEnabled !== 'false');
-        setChatNotificationsEnabled(storedChatNotificationsEnabled !== 'false');
-        setPostNotificationsEnabled(storedPostNotificationsEnabled !== 'false');
-      } catch (e) {
-        console.error('Error loading settings:', e);
+  // load username from AsyncStorage
+  async function loadUsername() {
+    try {
+      const value = await AsyncStorage.getItem('username');
+      if (value !== null) {
+        setUsername(value);
+      } else {
+        setUsername('John Doe'); // Default value if not found
       }
-    };
-
-    loadUserData();
-  }, []);
-
-  // Handle toggling main notifications
-  const toggleNotifications = async (value: boolean) => {
-    try {
-      setNotificationsEnabled(value);
-      await AsyncStorage.setItem('notificationsEnabled', value ? 'true' : 'false');
-
-      if (value) {
-        // Re-register for push notifications if they were turned on
-        const token = await registerForPushNotificationsAsync();
-        if (token) {
-          setPushToken(token.data);
-          await AsyncStorage.setItem('pushToken', token.data);
-        }
-      }
-
-      // Update server with new preferences
-      await updateNotificationPreferences();
-    } catch (error) {
-      console.error('Error toggling notifications:', error);
-      Alert.alert('Error', 'Failed to update notification settings');
+    } catch (e) {
+      console.log(e);
     }
-  };
-
-  // Handle toggling chat notifications
-  const toggleChatNotifications = async (value: boolean) => {
-    try {
-      setChatNotificationsEnabled(value);
-      await AsyncStorage.setItem('chatNotificationsEnabled', value ? 'true' : 'false');
-      await updateNotificationPreferences();
-    } catch (error) {
-      console.error('Error toggling chat notifications:', error);
-      Alert.alert('Error', 'Failed to update notification settings');
-    }
-  };
-
-  // Handle toggling post notifications
-  const togglePostNotifications = async (value: boolean) => {
-    try {
-      setPostNotificationsEnabled(value);
-      await AsyncStorage.setItem('postNotificationsEnabled', value ? 'true' : 'false');
-      await updateNotificationPreferences();
-    } catch (error) {
-      console.error('Error toggling post notifications:', error);
-      Alert.alert('Error', 'Failed to update notification settings');
-    }
-  };
-
-  // Update notification preferences on server
-  const updateNotificationPreferences = async () => {
-    if (!userId) return;
-
-    try {
-      const response = await fetch(`${ENV.API_URL}/users/${userId}/notifications`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          enabled: notificationsEnabled,
-          chat_enabled: chatNotificationsEnabled,
-          post_enabled: postNotificationsEnabled,
-          push_token: pushToken || undefined
-        }),
-      });
-
-      if (!response.ok) {
-        console.error('Failed to update notification preferences on server');
-      }
-    } catch (error) {
-      console.error('Error updating notification preferences:', error);
-    }
-  };
+  }
 
   return (
     <ImageBackground
@@ -167,51 +70,20 @@ export default function SettingsScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Notifications Section - Enhanced */}
+          {/* Preferences Section */}
           <View style={styles.section}>
-            <Text style={styles.sectionHeader}>Notifications</Text>
+            <Text style={styles.sectionHeader}>Preferences</Text>
 
             <View style={styles.settingItem}>
-              <Text style={styles.settingText}>Enable All Notifications</Text>
+              <Text style={styles.settingText}>Notifications</Text>
               <Switch
                 trackColor={{ false: "#767577", true: "#81b0ff" }}
                 thumbColor={notificationsEnabled ? "#f5dd4b" : "#f4f3f4"}
                 ios_backgroundColor="#3e3e3e"
-                onValueChange={toggleNotifications}
+                onValueChange={() => setNotificationsEnabled(!notificationsEnabled)}
                 value={notificationsEnabled}
               />
             </View>
-
-            {notificationsEnabled && (
-              <>
-                <View style={styles.settingItem}>
-                  <Text style={styles.settingText}>Chat Messages</Text>
-                  <Switch
-                    trackColor={{ false: "#767577", true: "#81b0ff" }}
-                    thumbColor={chatNotificationsEnabled ? "#f5dd4b" : "#f4f3f4"}
-                    ios_backgroundColor="#3e3e3e"
-                    onValueChange={toggleChatNotifications}
-                    value={chatNotificationsEnabled}
-                  />
-                </View>
-
-                <View style={styles.settingItem}>
-                  <Text style={styles.settingText}>Post Activity</Text>
-                  <Switch
-                    trackColor={{ false: "#767577", true: "#81b0ff" }}
-                    thumbColor={postNotificationsEnabled ? "#f5dd4b" : "#f4f3f4"}
-                    ios_backgroundColor="#3e3e3e"
-                    onValueChange={togglePostNotifications}
-                    value={postNotificationsEnabled}
-                  />
-                </View>
-              </>
-            )}
-          </View>
-
-          {/* Preferences Section */}
-          <View style={styles.section}>
-            <Text style={styles.sectionHeader}>Preferences</Text>
 
             <View style={styles.settingItem}>
               <Text style={styles.settingText}>Dark Mode</Text>
