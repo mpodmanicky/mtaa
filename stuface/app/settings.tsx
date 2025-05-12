@@ -9,11 +9,17 @@ import {
   StatusBar,
   TouchableOpacity,
   Switch,
+  Alert,
 } from 'react-native';
 import { useTheme } from '@/context/ThemeContex';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  requestNotificationPermissions,
+  getNotificationPermissionStatus,
+  showTestNotification
+} from '@/utils/notifications';
 
 export default function SettingsScreen() {
   const { theme, toggleTheme, toggleHighContrast, isHighContrast } = useTheme();
@@ -21,6 +27,7 @@ export default function SettingsScreen() {
   const styles = dynamicStyles(theme);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [username, setUsername] = useState('John Doe'); // Example username
+  const [permissionStatus, setPermissionStatus] = useState<string>('unknown');
 
   // Load settings on component mount
   useEffect(() => {
@@ -35,6 +42,10 @@ export default function SettingsScreen() {
         // Load notification settings
         const notificationSetting = await AsyncStorage.getItem('notificationsEnabled');
         setNotificationsEnabled(notificationSetting !== 'false');
+
+        // Check and update permission status
+        const status = await getNotificationPermissionStatus();
+        setPermissionStatus(status);
       } catch (e) {
         console.log('Error loading settings:', e);
       }
@@ -45,11 +56,110 @@ export default function SettingsScreen() {
 
   // Handle notification toggle
   const handleNotificationsToggle = async (value: boolean) => {
-    setNotificationsEnabled(value);
+    // If turning ON notifications
+    if (value) {
+      // Check current permission status
+      const status = await getNotificationPermissionStatus();
+
+      // If permission not granted, request it
+      if (status !== 'granted') {
+        // Show explanation dialog
+        Alert.alert(
+          "Enable Notifications",
+          "StuFace would like to send you notifications for new messages and activity on your posts.",
+          [
+            {
+              text: "Not Now",
+              style: "cancel",
+              onPress: () => {
+                // Keep toggle off if user cancels
+                setNotificationsEnabled(false);
+                AsyncStorage.setItem('notificationsEnabled', 'false');
+              }
+            },
+            {
+              text: "Allow",
+              onPress: async () => {
+                // Request system permission
+                const granted = await requestNotificationPermissions();
+
+                // Update permission status
+                const newStatus = await getNotificationPermissionStatus();
+                setPermissionStatus(newStatus);
+
+                if (granted) {
+                  // If granted, turn on notifications
+                  setNotificationsEnabled(true);
+                  await AsyncStorage.setItem('notificationsEnabled', 'true');
+
+                  // Show success message
+                  setTimeout(() => {
+                    Alert.alert(
+                      "Notifications Enabled",
+                      "You will now receive notifications for new messages and activity.",
+                      [
+                        {
+                          text: "Test Notification",
+                          onPress: showTestNotification
+                        },
+                        {
+                          text: "OK"
+                        }
+                      ]
+                    );
+                  }, 500);
+                } else {
+                  // If denied, keep toggle off
+                  setNotificationsEnabled(false);
+                  await AsyncStorage.setItem('notificationsEnabled', 'false');
+
+                  // Show instructions for settings
+                  setTimeout(() => {
+                    Alert.alert(
+                      "Permission Required",
+                      "Please enable notifications for StuFace in your device settings to receive notifications.",
+                      [{ text: "OK" }]
+                    );
+                  }, 500);
+                }
+              }
+            }
+          ]
+        );
+        return; // Exit early - don't update state until after permission flow
+      }
+
+      // If we already have permission, just turn it on
+      setNotificationsEnabled(true);
+      await AsyncStorage.setItem('notificationsEnabled', 'true');
+    } else {
+      // If turning OFF notifications, just update the setting
+      setNotificationsEnabled(false);
+      await AsyncStorage.setItem('notificationsEnabled', 'false');
+    }
+  };
+
+  // Add a function to test notifications
+  const testNotification = async () => {
+    if (!notificationsEnabled || permissionStatus !== 'granted') {
+      Alert.alert(
+        "Notifications Disabled",
+        "Please enable notifications first to test this feature.",
+        [{ text: "OK" }]
+      );
+      return;
+    }
+
     try {
-      await AsyncStorage.setItem('notificationsEnabled', value ? 'true' : 'false');
-    } catch (e) {
-      console.log('Error saving notification setting:', e);
+      await showTestNotification();
+      Alert.alert(
+        "Test Notification Sent",
+        "If you don't see the notification, please check your device settings.",
+        [{ text: "OK" }]
+      );
+    } catch (error) {
+      console.error('Error sending test notification:', error);
+      Alert.alert("Error", "Failed to send test notification");
     }
   };
 
@@ -108,11 +218,21 @@ export default function SettingsScreen() {
               />
             </View>
 
+            {/* Add this informational block about permissions
+            {notificationsEnabled && permissionStatus !== 'granted' && (
+              <View style={styles.warningBox}>
+                <Text style={styles.warningText}>
+                  Notifications are enabled in the app, but system permission is not granted.
+                  You won't receive notifications until permission is granted in your device settings.
+                </Text>
+              </View>
+            )} */}
+
             <View style={styles.settingItem}>
               <Text style={styles.settingText}>Dark Mode</Text>
               <Switch
                 trackColor={{ false: "#767577", true: "#81b0ff" }}
-                thumbColor={"#f4f3f4"}
+                thumbColor={theme.dark ? "#f5dd4b" : "#f4f3f4"}
                 ios_backgroundColor="#3e3e3e"
                 onValueChange={toggleTheme}
                 value={theme.dark}
@@ -262,6 +382,19 @@ const dynamicStyles = (theme: any) => StyleSheet.create({
     marginTop: 0,
   },
   infoText: {
+    color: theme.colors.text,
+    fontSize: 14,
+  },
+  warningBox: {
+    backgroundColor: 'rgba(255, 59, 48, 0.1)',
+    borderRadius: 8,
+    padding: 12,
+    margin: 15,
+    marginTop: 0,
+    borderLeftWidth: 3,
+    borderLeftColor: '#FF3B30',
+  },
+  warningText: {
     color: theme.colors.text,
     fontSize: 14,
   },
