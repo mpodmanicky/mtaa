@@ -11,6 +11,7 @@ import {
   Platform,
   StatusBar,
   RefreshControl, // Add this import
+  Alert // Make sure Alert is imported
 } from 'react-native';
 import { useTheme } from '@/context/ThemeContex';
 import { Stack } from 'expo-router';
@@ -19,6 +20,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import Inputs from '@/components/Inputs';
 import { ENV } from '@/utils/env';
+import {
+  showMessageNotification,
+  setAppInForeground,
+  setAppInBackground,
+  requestNotificationPermissions, // Add this
+  getNotificationPermissionStatus // Add this
+} from '@/utils/notifications';
 
 // Define message type
 interface Message {
@@ -40,6 +48,57 @@ export default function MessagesScreen() {
   const ws = useRef<WebSocket | null>(null);
   const { conversationId, username } = useLocalSearchParams();
   const [refreshing, setRefreshing] = useState(false); // Add this state
+
+  // Add this useEffect at the top of your components effects section
+  // Right after the component definition
+  useEffect(() => {
+    // Check and request notification permissions
+    const setupNotifications = async () => {
+      try {
+        // Get current settings value
+        const notificationsEnabled = await AsyncStorage.getItem('notificationsEnabled');
+
+        // If notifications are enabled in app settings, check system permissions
+        if (notificationsEnabled !== 'false') {
+          const status = await getNotificationPermissionStatus();
+
+          if (status !== 'granted') {
+            // Show an explanation first
+            Alert.alert(
+              "Enable Notifications",
+              "StuFace would like to send you notifications when you receive new messages.",
+              [
+                {
+                  text: "Not Now",
+                  style: "cancel"
+                },
+                {
+                  text: "Allow",
+                  onPress: async () => {
+                    const granted = await requestNotificationPermissions();
+                    if (!granted) {
+                      // If permission was denied, show how to enable it in settings
+                      setTimeout(() => {
+                        Alert.alert(
+                          "Notifications Disabled",
+                          "To receive notifications about new messages, please enable notifications in your device settings.",
+                          [{ text: "OK" }]
+                        );
+                      }, 500);
+                    }
+                  }
+                }
+              ]
+            );
+          }
+        }
+      } catch (error) {
+        console.error('Error setting up notifications:', error);
+      }
+    };
+
+    setupNotifications();
+  }, []); // Only run once on component mount
 
   // Load user data on component mount
   useEffect(() => {
@@ -74,42 +133,72 @@ export default function MessagesScreen() {
       fetchMessages();
     };
 
+    // Update your WebSocket message handler
+
     ws.current.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
         console.log('Received message:', data);
 
+        // Only process messages for this conversation
         if (data.type === 'message' && data.conversationId === conversationId) {
-          // Check if we already have this message (by server-generated id or client timestamp)
-          // This prevents showing duplicates
-          setMessages((prevMessages) => {
-            // Check if message already exists in our list
-            const messageExists = prevMessages.some(
-              (msg) =>
-                // If server message has an ID, check if we have it
-                (data.id && msg.id === data.id) ||
-                // Or if timestamps match closely (for optimistic updates)
-                (!data.id && data.timestamp && Math.abs(msg.timestamp - data.timestamp) < 1000 &&
-                   msg.text === data.text && msg.sender === data.sender)
-            );
+          // IMPORTANT FIX: Check if this message is from the current user (our own message)
+          const isOwnMessage = data.sender === userId;
 
-            // Only add the message if it doesn't exist
+          setMessages((prevMessages) => {
+            // IMPROVED DUPLICATE DETECTION - Check for duplicates more thoroughly
+            const messageExists = prevMessages.some((msg) => {
+              // Case 1: Match by server-generated ID
+              if (data.id && msg.id === data.id) {
+                return true;
+              }
+
+              // Case 2: Match by client-generated ID (for our optimistic updates)
+              if (data.clientMessageId && msg.id === data.clientMessageId) {
+                return true;
+              }
+
+              // Case 3: Match by content + timestamp + sender (fuzzy matching)
+              if (
+                data.sender === msg.sender &&
+                data.text === msg.text &&
+                data.timestamp &&
+                Math.abs(msg.timestamp - data.timestamp) < 2000 // Allow 2 second difference
+              ) {
+                return true;
+              }
+
+              return false;
+            });
+
+            // Only add if it's not a duplicate
             if (!messageExists) {
               const newMessage: Message = {
                 id: data.id || Date.now().toString(),
                 text: data.text,
                 sender: data.sender,
                 timestamp: data.timestamp || Date.now(),
-                isMine: data.sender === userId,
+                isMine: isOwnMessage,
               };
 
               return [...prevMessages, newMessage];
             }
 
+            // If it's a duplicate, just return the existing messages
             return prevMessages;
           });
 
-          // Scroll to bottom on new message
+          // Notification handling (only for messages from others)
+          if (data.sender !== userId) {
+            const senderDisplayName = data.senderName || username || 'New Message';
+            showMessageNotification(
+              senderDisplayName,
+              data.text,
+              conversationId as string
+            );
+          }
+
+          // Scroll to bottom
           setTimeout(() => {
             scrollViewRef.current?.scrollToEnd({ animated: true });
           }, 100);
@@ -197,30 +286,31 @@ export default function MessagesScreen() {
     fetchMessages();
   };
 
-  // Send message function
-  const sendMessage = () => {
-    if (!messageText.trim() || !ws.current || !userId || !conversationId)
-      return;
 
-    // Generate a client-side message ID
-    const clientMessageId = Date.now().toString();
-    const timestamp = Date.now();
+const sendMessage = () => {
+  if (!messageText.trim() || !ws.current || !userId || !conversationId)
+    return;
 
-    // Send message through WebSocket
-    const messagePayload = {
-      type: 'message',
-      text: messageText,
-      sender: userId,
-      conversationId: conversationId,
-      timestamp: timestamp,
-      clientMessageId: clientMessageId // Add this so server can use it
-    };
+  // Generate a client-side message ID
+  const clientMessageId = Date.now().toString();
+  const timestamp = Date.now();
 
+  // Send message through WebSocket
+  const messagePayload = {
+    type: 'message',
+    text: messageText,
+    sender: userId,
+    conversationId: conversationId,
+    timestamp: timestamp,
+    clientMessageId: clientMessageId // This is critical for deduplication
+  };
+
+  try {
     ws.current.send(JSON.stringify(messagePayload));
 
     // Optimistically add message to UI with its temporary ID
     const newMessage: Message = {
-      id: clientMessageId,
+      id: clientMessageId, // Use the same ID as clientMessageId for matching
       text: messageText,
       sender: userId,
       timestamp: timestamp,
@@ -234,7 +324,11 @@ export default function MessagesScreen() {
     setTimeout(() => {
       scrollViewRef.current?.scrollToEnd({ animated: true });
     }, 100);
-  };
+  } catch (error) {
+    console.error('Error sending message:', error);
+    Alert.alert('Error', 'Failed to send message. Please try again.');
+  }
+};
 
   // Format timestamp to readable time
   const formatTime = (timestamp: number) => {
@@ -248,6 +342,48 @@ export default function MessagesScreen() {
       useMockMessages();
     }
   }, []);
+
+  // This tracks when the chat screen is active or not
+  useEffect(() => {
+    // When the screen becomes active
+    const unsubscribeFocus = router.events?.on('focus', () => {
+      setAppInForeground();
+      console.log('Messages screen in focus - notifications disabled');
+    });
+
+    // When the screen is no longer active
+    const unsubscribeBlur = router.events?.on('blur', () => {
+      setAppInBackground();
+      console.log('Messages screen blurred - notifications enabled');
+    });
+
+    // Set as foreground initially since user is on this screen
+    setAppInForeground();
+
+    return () => {
+      // Clean up event listeners
+      unsubscribeFocus && unsubscribeFocus();
+      unsubscribeBlur && unsubscribeBlur();
+    };
+  }, [router.events]);
+
+  const triggerTestNotification = async () => {
+    try {
+      // First make the app think it's in the background
+      await setAppInBackground();
+
+      // Then trigger a notification
+      await showMessageNotification(
+        'Test User',
+        'This is a test notification message. Tap to open.',
+        conversationId as string
+      );
+
+      console.log('Test notification triggered');
+    } catch (error) {
+      console.error('Error triggering test notification:', error);
+    }
+  };
 
   return (
     <>
@@ -331,6 +467,12 @@ export default function MessagesScreen() {
               </TouchableOpacity>
             </View>
           </KeyboardAvoidingView>
+          <TouchableOpacity
+            style={styles.testNotificationButton}
+            onPress={triggerTestNotification}
+          >
+            <Text style={styles.testNotificationText}>Test Notification</Text>
+          </TouchableOpacity>
         </SafeAreaView>
       </ImageBackground>
     </>
@@ -437,5 +579,25 @@ const dynamicStyles = (theme: any) =>
       backgroundColor: theme.colors.primary,
       justifyContent: 'center',
       alignItems: 'center',
+    },
+    testNotificationButton: {
+      position: 'absolute',
+      top: 100,
+      right: 20,
+      backgroundColor: theme.colors.primary,
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      borderRadius: 20,
+      zIndex: 100,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 3.84,
+      elevation: 5,
+    },
+    testNotificationText: {
+      color: 'white',
+      fontWeight: 'bold',
+      fontSize: 12,
     },
   });

@@ -2,7 +2,7 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
 // Replace with your development machine's actual IP address
-const LOCAL_MACHINE_IP = '192.168.68.122';
+const LOCAL_MACHINE_IP = '147.175.160.224';
 
 // Check if we're running in development mode
 const isDev = __DEV__;
